@@ -844,11 +844,12 @@ class connlibExt {
     static IDAStar(source, target, direction){
         console.log("start searching path: ", source, target);
         let start = new Date().getTime();
-        let grid = connlib._instance._internalGrid.cells;
         var stack = {};
-        var thresehold = this.manhattenDistance(source, target);
-        stack[thresehold.toString()] = {};
-        stack[thresehold.toString()][source.r] = source;
+        var threshold = this.manhattenDistance(source, target);
+        //var passed = {};
+        stack[threshold.toString()] = {};
+        stack[threshold.toString()][source.r] = source;
+        //passed[source.r.toString()] = [source.c];
         var found = false;
         let max = 1000;
         var i = 0;
@@ -863,21 +864,21 @@ class connlibExt {
                 }
                 throw ("maximum number of loops reached!");
             }
-            stack[thresehold.toString()][s.r].seq = i;
-            let frontier = this.surroundingManhattenMinimumCells(s, target, grid);
+            stack[threshold.toString()][s.r].seq = i;
+            let frontier = this.surroundingManhattenMinimumCells(s, target);
             var next = null;
             for(let c of frontier){
                 if(!stack[c.d.toString()]) stack[c.d.toString()] = {};
                 if(!stack[c.d.toString()][c.o.r.toString()]){
                     stack[c.d.toString()][c.o.r.toString()] = c.o;
                 }
-                if(c.d < thresehold) thresehold = c.d;
+                if(c.d < threshold) threshold = c.d;
                 if(c.o.r == target.r && c.o.c == target.c) {
                     found = true;
                     stack[c.d.toString()][c.o.r.toString()].seq = i+1;
                     break;
                 }
-                if(c.d == thresehold && c.o.d == direction){
+                if(c.d == threshold && c.o.d == direction){
                     if(s.r == c.o.r && s.c == c.o.c){
                         console.log(frontier);
                         throw("endless loop!");
@@ -885,21 +886,29 @@ class connlibExt {
                     next = c.o;
                 }
             }
-            grid[s.r][s.c].p = 1;
+            //grid[s.r][s.c].p = 1;
+            
             if(found) continue;
             if(next == null){
-                next = stack[thresehold][Object.keys(stack[thresehold])[0]];
+                next = stack[threshold][Object.keys(stack[threshold])[0]];
                 if(s.r == next.r && s.c == next.c){
-                    console.log(stack[thresehold], frontier, grid[next.r]);
+                    for(let dist in stack){
+                        for(let row in stack[dist]){
+                            if(stack[dist][row]) connlib.point(stack[dist][row], "red");
+                        }
+                    }
+                    console.log(stack);
+                    console.log(threshold);
+                    console.log(frontier);
+                    console.log(i);
                     throw("endless loop!");
                 }
-                s = next;
             }
+            s = next;
             if(!s){
                 console.log(stack, c.o);
                 throw("error: cannot find next node!");
             }
-            //if(i == 20) found = true;
             i++;
         }
         for(let dist in stack){
@@ -909,7 +918,13 @@ class connlibExt {
         }
         console.log("time required: (ms) " + (new Date().getTime() - start));
     }
-
+    /**
+     * OLD VERSION - NOT WORKING PROPERLY
+     * @param {*} source 
+     * @param {*} target 
+     * @param {*} d 
+     * @param {*} complete 
+     */
     static idastar(source, target, d, complete) {
         console.log("start searching path: ", source, target);
         let grid = connlib._instance._internalGrid.cells;
@@ -953,8 +968,8 @@ class connlibExt {
      * @param {*} source centered cell
      * @param {*} target connection's target for manhatten distance
      */
-    static surroundingManhattenMinimumCells(source, target, grid) {
-        let s = this.surroundingCellsNoDiag(source, grid);
+    static surroundingManhattenMinimumCells(source, target) {
+        let s = this.surroundingCellsNoDiag(source);
         return s.map(x => {
             return { "d": this.manhattenDistance(x, target), "o": x }
         });
@@ -964,29 +979,26 @@ class connlibExt {
      * the result contains a direction
      * @param {*} cell center
      */
-    static surroundingCellsNoDiag(cell, grid) {
+    static surroundingCellsNoDiag(cell) {
         var o = [];
+        let grid = connlib.instance._internalGrid.cells;
         var c;
 
-        if (grid[cell.r - 1] && grid[cell.r - 1][cell.c] && grid[cell.r - 1][cell.c].w == 1 && grid[cell.r - 1][cell.c].p != 1) {
-            c = grid[cell.r - 1][cell.c];
-            c.d = connlibDir.T;
-            o.push(c);
+        if (grid[cell.r - 1] && grid[cell.r - 1][cell.c] && grid[cell.r - 1][cell.c].w == 1) {
+            c = grid[cell.r-1][cell.c];
+            o.push({"c": c.c, "r": c.r, "d": connlibDir.T });
         }
-        if (grid[cell.r] && grid[cell.r][cell.c + 1] && grid[cell.r][cell.c + 1].w == 1 && grid[cell.r][cell.c + 1].p != 1) {
-            c = grid[cell.r][cell.c + 1];
-            c.d = connlibDir.R;
-            o.push(c);
+        if (grid[cell.r] && grid[cell.r][cell.c + 1] && grid[cell.r][cell.c + 1].w == 1) {
+            c = grid[cell.r][cell.c+1];
+            o.push({"c": c.c, "r": c.r, "d": connlibDir.R });
         }
-        if (grid[cell.r + 1] && grid[cell.r + 1][cell.c] && grid[cell.r + 1][cell.c].w == 1 && grid[cell.r + 1][cell.c].p != 1) {
-            c = grid[cell.r + 1][cell.c];
-            c.d = connlibDir.B;
-            o.push(c);
+        if (grid[cell.r + 1] && grid[cell.r + 1][cell.c] && grid[cell.r + 1][cell.c].w == 1) {
+            c = grid[cell.r+1][cell.c];
+            o.push({"c": c.c, "r": c.r, "d": connlibDir.B });
         }
-        if (grid[cell.r] && grid[cell.r][cell.c - 1] && grid[cell.r][cell.c - 1].w == 1 && grid[cell.r][cell.c - 1].p != 1) {
-            c = grid[cell.r][cell.c - 1];
-            c.d = connlibDir.L;
-            o.push(c);
+        if (grid[cell.r] && grid[cell.r][cell.c - 1] && grid[cell.r][cell.c - 1].w == 1) {
+            c = grid[cell.r][cell.c-1];
+            o.push({"c": c.c, "r": c.r, "d": connlibDir.L });
         }
 
         return o;
