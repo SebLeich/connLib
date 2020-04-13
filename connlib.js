@@ -64,7 +64,7 @@ class connlib {
     _gridCellsRendered = false;
 
     // how far should the endpoints stand
-    static _endpointStag = 10;
+    static _endpointStag = 40;
 
     constructor() {
 
@@ -83,7 +83,7 @@ class connlib {
     /**
      * the method clears the background svg
      */
-    clear(){
+    clear() {
         document.getElementById("background-grid").innerHTML = "";
     }
     /**
@@ -190,6 +190,7 @@ class connlib {
 
     render() {
         this.updateGrid();
+        connlib.applyTransform();
         let bg = document.getElementById("background-grid");
         for (let e of connlib._instance._endpoints) {
             let corrL = e.left - parseFloat(bg.style.left);
@@ -254,7 +255,6 @@ class connlib {
         for (let e of connlib._instance._connections) {
 
         }
-        connlib.applyTransform();
         /*
         for (let e of this._endpoints) {
             let s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -381,11 +381,11 @@ class connlib {
             this._gridCellsRendered = true;
             let elements = document.getElementsByClassName("connlib-element");
             for (let element of elements) element.style.display = "none";
-            for(let rI in this._internalGrid.cells){
-                for(let cI in this._internalGrid.cells[rI]){
-                    if(this._renderCellsWalkable && this._internalGrid.cells[rI][cI].w == 1){
+            for (let rI in this._internalGrid.cells) {
+                for (let cI in this._internalGrid.cells[rI]) {
+                    if (this._renderCellsWalkable && this._internalGrid.cells[rI][cI].w == 1) {
                         connlib.point(this._internalGrid.cells[rI][cI], "green");
-                    } else if(this._renderCellsNotWalkable && this._internalGrid.cells[rI][cI].w == 0){
+                    } else if (this._renderCellsNotWalkable && this._internalGrid.cells[rI][cI].w == 0) {
                         connlib.point(this._internalGrid.cells[rI][cI], "orange");
                     }
                 }
@@ -841,81 +841,101 @@ class connlibExt {
         };
     }
 
-    static IDAStar(source, target, direction){
+    static IDAStar(source, target, direction) {
         console.log("start searching path: ", source, target);
         let start = new Date().getTime();
         var stack = {};
         var threshold = this.manhattenDistance(source, target);
-        //var passed = {};
+        var passed = {};
         stack[threshold.toString()] = {};
         stack[threshold.toString()][source.r] = source;
-        //passed[source.r.toString()] = [source.c];
+        passed[source.r.toString()] = [source.c];
         var found = false;
-        let max = 1000;
+        let max = 1000000;
         var i = 0;
         var s = source;
-        while(!found){
+        var inc = false;
+        while (!found) {
             if (i == max) {
                 console.log(stack);
-                for(let dist in stack){
-                    for(let row in stack[dist]){
-                        if(stack[dist][row]) connlib.point(stack[dist][row], "red");
+                for (let dist in stack) {
+                    for (let row in stack[dist]) {
+                        if (stack[dist][row]) connlib.point(stack[dist][row], "red");
                     }
                 }
                 throw ("maximum number of loops reached!");
             }
-            stack[threshold.toString()][s.r].seq = i;
             let frontier = this.surroundingManhattenMinimumCells(s, target);
             var next = null;
-            for(let c of frontier){
-                if(!stack[c.d.toString()]) stack[c.d.toString()] = {};
-                if(!stack[c.d.toString()][c.o.r.toString()]){
+            for (let c of frontier) {
+                if (!stack[c.d.toString()]) stack[c.d.toString()] = {};
+                if (!stack[c.d.toString()][c.o.r.toString()]) {
                     stack[c.d.toString()][c.o.r.toString()] = c.o;
                 }
-                if(c.d < threshold) threshold = c.d;
-                if(c.o.r == target.r && c.o.c == target.c) {
+                if (c.d < threshold){
+                    threshold = c.d;
+                    if(inc){
+                        inc = false;
+                        console.log(c);
+                    }
+                }
+                if (c.o.r == target.r && c.o.c == target.c) {
                     found = true;
-                    stack[c.d.toString()][c.o.r.toString()].seq = i+1;
+                    stack[c.d.toString()][c.o.r.toString()].seq = i + 1;
                     break;
                 }
-                if(c.d == threshold && c.o.d == direction){
-                    if(s.r == c.o.r && s.c == c.o.c){
+                if (c.d == threshold && c.o.d == direction) {
+                    if (s.r == c.o.r && s.c == c.o.c) {
                         console.log(frontier);
-                        throw("endless loop!");
+                        throw ("endless loop!");
                     }
                     next = c.o;
                 }
             }
-            //grid[s.r][s.c].p = 1;
-            
-            if(found) continue;
-            if(next == null){
-                next = stack[threshold][Object.keys(stack[threshold])[0]];
-                if(s.r == next.r && s.c == next.c){
-                    for(let dist in stack){
-                        for(let row in stack[dist]){
-                            if(stack[dist][row]) connlib.point(stack[dist][row], "red");
+
+            if (found) continue;
+            var thI = 0;
+            while (next == null) {
+                if (thI > 10000) {
+                    for (let dist in stack) {
+                        for (let row in stack[dist]) {
+                            if (stack[dist][row]) connlib.point(stack[dist][row], "red");
                         }
                     }
-                    console.log(stack);
-                    console.log(threshold);
-                    console.log(frontier);
-                    console.log(i);
-                    throw("endless loop!");
+                    throw ("increase threshold seems useless");
                 }
+                for (let i in stack[threshold.toString()]) {
+                    try {
+                        if (!passed[threshold.toString()] || !passed[threshold.toString()].includes(stack[threshold.toString()][i].c)) {
+                            next = stack[threshold.toString()][i];
+                            break;
+                        }
+                    } catch (e) {
+                        console.log(next, stack, passed, threshold);
+                        throw(e);
+                    }
+                }
+                if (next == null){
+                    if(!inc){
+                        inc = true;
+                        console.log("x: " + s.c + ", y: " + s.r + ", from: " + s.d);
+                        connlib.point(s, "violet");
+                    }
+                    threshold++;
+                }
+                thI++;
             }
             s = next;
-            if(!s){
+            if (!passed[threshold.toString()]) passed[threshold.toString()] = [s.c];
+            else passed[threshold.toString()].push(s.c);
+            stack[threshold.toString()][s.r].seq = i;
+            if (!s) {
                 console.log(stack, c.o);
-                throw("error: cannot find next node!");
+                throw ("error: cannot find next node!");
             }
             i++;
         }
-        for(let dist in stack){
-            for(let row in stack[dist]){
-                if(stack[dist][row]) connlib.point(stack[dist][row], "red");
-            }
-        }
+        //console.log(stack);
         console.log("time required: (ms) " + (new Date().getTime() - start));
     }
     /**
@@ -985,20 +1005,20 @@ class connlibExt {
         var c;
 
         if (grid[cell.r - 1] && grid[cell.r - 1][cell.c] && grid[cell.r - 1][cell.c].w == 1) {
-            c = grid[cell.r-1][cell.c];
-            o.push({"c": c.c, "r": c.r, "d": connlibDir.T });
+            c = grid[cell.r - 1][cell.c];
+            o.push({ "c": c.c, "r": c.r, "d": connlibDir.T });
         }
         if (grid[cell.r] && grid[cell.r][cell.c + 1] && grid[cell.r][cell.c + 1].w == 1) {
-            c = grid[cell.r][cell.c+1];
-            o.push({"c": c.c, "r": c.r, "d": connlibDir.R });
+            c = grid[cell.r][cell.c + 1];
+            o.push({ "c": c.c, "r": c.r, "d": connlibDir.R });
         }
         if (grid[cell.r + 1] && grid[cell.r + 1][cell.c] && grid[cell.r + 1][cell.c].w == 1) {
-            c = grid[cell.r+1][cell.c];
-            o.push({"c": c.c, "r": c.r, "d": connlibDir.B });
+            c = grid[cell.r + 1][cell.c];
+            o.push({ "c": c.c, "r": c.r, "d": connlibDir.B });
         }
         if (grid[cell.r] && grid[cell.r][cell.c - 1] && grid[cell.r][cell.c - 1].w == 1) {
-            c = grid[cell.r][cell.c-1];
-            o.push({"c": c.c, "r": c.r, "d": connlibDir.L });
+            c = grid[cell.r][cell.c - 1];
+            o.push({ "c": c.c, "r": c.r, "d": connlibDir.L });
         }
 
         return o;
