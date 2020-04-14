@@ -846,16 +846,15 @@ class connlibExt {
         let start = new Date().getTime();
         var stack = {};
         var threshold = this.manhattenDistance(source, target);
-        var passed = {};
         var path = [];
         stack[threshold.toString()] = {};
         stack[threshold.toString()][source.r] = source;
-        passed[source.r.toString()] = [source.c];
         var found = false;
         let max = 15000;
         var i = 0;
         var s = source;
         s.d = direction;
+        s.p = 1;
         path.push(s);
         var collisionFlag = null;
         while (!found) {
@@ -874,7 +873,7 @@ class connlibExt {
                 if (!stack[c.d.toString()]) stack[c.d.toString()] = {};
                 if (!stack[c.d.toString()][c.o.r.toString()]) {
                     stack[c.d.toString()][c.o.r.toString()] = c.o;
-                }
+                } else continue;
                 if (c.d < threshold) {
                     threshold = c.d;
                     if (collisionFlag) collisionFlag = null;
@@ -895,6 +894,12 @@ class connlibExt {
 
             if (found) continue;
             while (next == null) {
+                for (let i in stack[threshold.toString()]) {
+                    if(stack[threshold.toString()][i].p != 1){
+                        next = stack[threshold.toString()][i];
+                        break;
+                    }
+                }
                 while (collisionFlag) {
                     if (!cI) var cI = 1;
                     switch (collisionFlag.d) {
@@ -927,10 +932,28 @@ class connlibExt {
                             break;
                         case connlibDir.B:
                             if (connlib.instance._internalGrid.cells[collisionFlag.r + 1][collisionFlag.c - cI].w) {
-
+                                for(let fI = 1; fI < cI; fI++){
+                                    let o = {
+                                        "c": (collisionFlag.c-fI),
+                                        "r": (collisionFlag.r),
+                                        "d": connlibDir.L
+                                    };
+                                    let d = this.manhattenDistance(o, target);
+                                    if(!stack[d]) stack[d.toString()] = {};
+                                    stack[d.toString()][(collisionFlag.r).toString()] = o;
+                                }
                                 next = { "c": (collisionFlag.c - cI), "r": (collisionFlag.r), "d": connlibDir.L };
                             } else if (connlib.instance._internalGrid.cells[collisionFlag.r + 1][collisionFlag.c + cI].w) {
-
+                                for(let fI = 1; fI < cI; fI++){
+                                    let o = {
+                                        "c": (collisionFlag.c+fI),
+                                        "r": (collisionFlag.r),
+                                        "d": connlibDir.R
+                                    };
+                                    let d = this.manhattenDistance(o, target);
+                                    if(!stack[d]) stack[d.toString()] = {};
+                                    stack[d.toString()][(collisionFlag.r).toString()] = o;
+                                }
                                 next = { "c": (collisionFlag.c + cI), "r": (collisionFlag.r), "d": connlibDir.R };
                             }
                             break;
@@ -997,52 +1020,32 @@ class connlibExt {
                         if (!stack[d]) stack[d.toString()] = {};
                         stack[d.toString()][(next.r).toString()] = next;
                         threshold = d;
-                        collisionFlag
                     }
                     cI++;
                 }
-                for (let i in stack[threshold.toString()]) {
-                    try {
-                        if (!passed[threshold.toString()] || !passed[threshold.toString()].includes(stack[threshold.toString()][i].c)) {
-                            next = stack[threshold.toString()][i];
-                            break;
-                        }
-                    } catch (e) {
-                        console.log(next, stack, passed, threshold);
-                        throw (e);
-                    }
-                }
                 if (next == null && !collisionFlag){
                     collisionFlag = s;
-                    console.log("pushed: ", s);
-                    path.push(collisionFlag);
                 }
             }
             if(s.d != next.d){
-                console.log("pushed: ", s, ", next: ", next);
-                connlib.point(s, "red");
                 path.push(s);
             }
             s = next;
-            if (!passed[threshold.toString()]) passed[threshold.toString()] = [s.c];
-            else passed[threshold.toString()].push(s.c);
-            try {
-                stack[threshold.toString()][s.r].seq = i;
-            } catch (e) {
-                console.log(stack, threshold, i, s);
-                throw (e);
-            }
             if (!s) {
                 console.log(stack, c.o);
                 throw ("error: cannot find next node!");
             }
+            s.p = 1;
+            s.seq = i;
             i++;
         }
-        console.log("pushed: ", target);
         path.push(target);
-        for (let point of path) connlib.point(point, "red");
-        console.log("time required: (ms) " + (new Date().getTime() - start));
+        return {
+            path: path,
+            time: new Date().getTime() - start
+        };
     }
+    
     /**
      * OLD VERSION - NOT WORKING PROPERLY
      * @param {*} source 
