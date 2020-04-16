@@ -5,35 +5,6 @@ class connlibAbstractRenderable {
     constructor() {
 
     }
-
-    get domId() {
-        return this.guid;
-    }
-    /**
-     * the method returns whether the current instance is currently rendered
-     */
-    isRendered() {
-        if (document.getElementById(this.domId)) {
-            return true;
-        }
-        return false;
-    }
-    /**
-     * the method enables user's to delete an element from the dom
-     */
-    remove() {
-        let elem = document.getElementById(this.domId);
-        elem.parentNode.removeChild(elem);
-    }
-}
-
-class connlibRenderable extends connlibAbstractRenderable {
-
-    canvas;
-
-    constructor() {
-        super();
-    }
 }
 
 class connlib {
@@ -48,10 +19,12 @@ class connlib {
 
     _connections = [];
     _endpoints = [];
+    _breakPoints = [];
     _canvas = [];
     _gridScale = 10;
     _renderGrid = false;
     _internalGrid;
+    _lines = [];
 
     _moveX = 0;
     _moveY = 0;
@@ -64,7 +37,9 @@ class connlib {
     _gridCellsRendered = false;
 
     // how far should the endpoints stand
-    static _endpointStag = 20;
+    static _endpointStag = 30;
+
+    static dragFlag = null;
 
     constructor() {
 
@@ -83,7 +58,9 @@ class connlib {
      * the method clears the background svg
      */
     clear() {
-        document.getElementById("background-grid").innerHTML = "";
+        if (!this.instance) return;
+        for (let e of this.instance._endpoints) e.clear();
+        for (let c of this.instance._connections) c.clear();
     }
     /**
      * the method enables user's to connect 2 dom elements and returns whether a connection can be established
@@ -113,6 +90,10 @@ class connlib {
             console.log("connlib is currently only supporting to connect elements by there identifier");
             return false;
         }
+    }
+
+    get container() {
+        return document.getElementById(this._containerId);
     }
 
     get containerId() {
@@ -152,6 +133,10 @@ class connlib {
             }
             this.applyTransform();
         });
+        window.addEventListener("mouseup", (event) => {
+            console.log(event, this.dragFlag);
+            this.dragFlag = null;
+        });
         return instance;
     }
 
@@ -171,9 +156,9 @@ class connlib {
         return true;
     }
 
-    static offset(element){
+    static offset(element) {
         let o = { "top": null, "left": null, "height": null, "width": null };
-        if(element){
+        if (element) {
             var rect = element.getBoundingClientRect();
             o.top = rect.top + document.body.scrollTop;
             o.left = rect.left + document.body.scrollLeft;
@@ -182,7 +167,7 @@ class connlib {
     }
 
     static point(point, color) {
-        let bg = document.getElementById("background-grid");
+        let bg = this.instance.container;
         let p = document.createElementNS("http://www.w3.org/2000/svg", "circle");
         p.setAttribute("cx", point.c);
         p.setAttribute("cy", point.r);
@@ -194,75 +179,10 @@ class connlib {
     render() {
         this.clear();
         this.updateGrid();
-        let bg = document.getElementById("background-grid");
-        for (let e of connlib._instance._endpoints) {
-            var corrL = Math.ceil((e.left - parseFloat(bg.style.left)) / connlib.instance._gridScale) * connlib.instance._gridScale;
-            var corrT = Math.ceil((e.top - parseFloat(bg.style.top)) / connlib.instance._gridScale) * connlib.instance._gridScale;
-            switch (e.type) {
-                case connlibEndpointType.DEFAULT:
-                    let c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-                    c.setAttribute("cx", corrL);
-                    c.setAttribute("cy", corrT);
-                    c.setAttribute("r", 5);
-                    c.setAttribute("fill", "black");
-                    let d = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                    d.style.stroke = "#373737";
-                    d.style.strokeWidth = 1;
-                    switch (e.direction) {
-                        case connlibEdgeDirection.TOP:
-                            d.setAttribute("d", "M" + corrL + " " + corrT + " L" + corrL + " " + (corrT - connlib._endpointStag));
-                            break;
-                        case connlibEdgeDirection.RIGHT:
-                            d.setAttribute("d", "M" + corrL + " " + corrT + " L" + (corrL + connlib._endpointStag) + " " + corrT);
-                            break;
-                        case connlibEdgeDirection.BOTTOM:
-                            d.setAttribute("d", "M" + corrL + " " + corrT + " L" + corrL + " " + (corrT + connlib._endpointStag));
-                            break;
-                        case connlibEdgeDirection.LEFT:
-                            d.setAttribute("d", "M" + corrL + " " + corrT + " L" + (corrL - connlib._endpointStag) + " " + corrT);
-                            break;
-                    }
-                    bg.appendChild(c);
-                    bg.appendChild(d);
-                    break;
-                case connlibEndpointType.ARROW:
-                    let a = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-                    a.style.fill = "#373737";
-                    a.style.strokeWidth = 1;
-                    let b = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                    b.style.stroke = "#373737";
-                    b.style.strokeWidth = 1;
-                    switch (e.direction) {
-                        case connlibEdgeDirection.TOP:
-                            a.setAttribute("points", corrL + "," + corrT + " " + (corrL - 10) + "," + (corrT - 20) + " " + (corrL + 10) + "," + (corrT - 20));
-                            b.setAttribute("d", "M" + corrL + " " + (corrT - 20) + " L" + corrL + " " + (corrT - connlib._endpointStag));
-                            break;
-                        case connlibEdgeDirection.RIGHT:
-                            a.setAttribute("points", corrL + "," + corrT + " " + (corrL + 20) + "," + (corrT + 10) + " " + (corrL + 20) + "," + (corrT - 10));
-                            b.setAttribute("d", "M" + (corrL + 20) + " " + corrT + " L" + (corrL + connlib._endpointStag) + " " + corrT);
-                            break;
-                        case connlibEdgeDirection.BOTTOM:
-                            a.setAttribute("points", corrL + "," + corrT + " " + (corrL + 10) + "," + (corrT + 20) + " " + (corrL - 10) + "," + (corrT + 20));
-                            b.setAttribute("d", "M" + corrL + " " + (corrT + 20) + " L" + corrL + " " + (corrT + connlib._endpointStag));
-                            break;
-                        case connlibEdgeDirection.LEFT:
-                            a.setAttribute("points", corrL + "," + corrT + " " + (corrL - 20) + "," + (corrT + 10) + " " + (corrL - 20) + "," + (corrT - 10));
-                            b.setAttribute("d", "M" + (corrL - 20) + " " + corrT + " L" + (corrL - connlib._endpointStag) + " " + corrT);
-                            break;
-                    }
-                    bg.appendChild(a);
-                    bg.appendChild(b);
-                    break;
-            }
-        }
+        for (let e of connlib._instance._endpoints) e.render();
         for (let c of connlib._instance._connections) {
-            c.calculatePath(false);
-            let b = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            b.style.stroke = "#373737";
-            b.style.strokeWidth = 1;
-            b.style.fill = "transparent";
-            b.setAttribute("d", c.pathString);
-            bg.appendChild(b);
+            c.calculatePath();
+            c.render();
         }
     }
 
@@ -297,8 +217,8 @@ class connlib {
         let elementRects = [...elements].map(x => x.getBoundingClientRect());
         let left = Math.min(...[...elementRects].map(x => x.left)) - this._gridPadding;
         let top = Math.min(...[...elementRects].map(x => x.top)) - this._gridPadding;
-        let width = Math.ceil((Math.max(...[...elementRects].map(x => x.right)) - left + (this._gridPadding))/this._gridScale) * this._gridScale;
-        let height = Math.ceil((Math.max(...[...elementRects].map(x => x.bottom)) - top + (this._gridPadding))/this._gridScale) * this._gridScale;
+        let width = Math.ceil((Math.max(...[...elementRects].map(x => x.right)) - left + (this._gridPadding)) / this._gridScale) * this._gridScale;
+        let height = Math.ceil((Math.max(...[...elementRects].map(x => x.bottom)) - top + (this._gridPadding)) / this._gridScale) * this._gridScale;
         let bg = document.getElementById("background-grid");
         bg.style.top = top;
         bg.style.left = left;
@@ -312,20 +232,26 @@ class connlib {
             let right = parseInt((rect.right - parseFloat(bg.style.left)));
             let top = parseInt((rect.top - parseFloat(bg.style.top)));
             let bottom = parseInt((rect.bottom - parseFloat(bg.style.top)));
-            for (var r = top; r <= bottom; r+=this._gridScale) {
-                for (var c = left; c <= right; c+=this._gridScale) {
+            for (var r = top; r <= bottom; r += this._gridScale) {
+                for (var c = left; c <= right; c += this._gridScale) {
                     this._internalGrid.cells[r][c].w = 0;
                 }
             }
         }
     }
 }
-
-class connlibConnection extends connlibRenderable {
+/**
+ * the class contains a connection
+ */
+class connlibConnection extends connlibAbstractRenderable {
 
     endpoints = [];
     pathPoints = [];
-
+    lines = [];
+    _rendered = false;
+    /**
+     * the constructor creates a new instance of a connection
+     */
     constructor(guid, endpoints) {
         super();
         if (guid) {
@@ -341,14 +267,12 @@ class connlibConnection extends connlibRenderable {
         }
         connlib.instance._connections.push(this);
     }
-
     /**
-     * the method allows developers to render calculated paths recursively
+     * the method allows developers to render calculated paths recursively and renders the line
      */
-    addPoint(point){
-        console.log(point);
+    addPoint(point) {
         this.pathPoints.push(point);
-        if(this.pathPoints.length > 1){
+        if (this.pathPoints.length > 1) {
             let last = this.pathPoints[this.pathPoints.length - 2];
             let bg = document.getElementById("background-grid");
             let d = document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -356,11 +280,23 @@ class connlibConnection extends connlibRenderable {
             d.style.strokeWidth = 1;
             d.setAttribute("d", "M" + last.c + " " + last.r + " L" + point.c + " " + point.r);
             bg.appendChild(d);
+            this.lines.push(d);
+            this._rendered = true;
         }
     }
-
-    calculatePath(recalculate) {
-        if(!recalculate && this.pathPoints.length > 0) return;
+    /**
+     * the method returns the dom visualization of the current connection
+     */
+    clear() {
+        for (let l of this.lines) l.clear();
+        this._rendered = false;
+    }
+    /**
+     * the method calculates the connections path
+     */
+    calculatePath() {
+        this.pathPoints = [];
+        if (this.isRendered()) this.clear();
         var direction;
         switch (this.endpoints[0].direction) {
             case connlibEdgeDirection.TOP:
@@ -376,21 +312,45 @@ class connlibConnection extends connlibRenderable {
                 direction = connlibDir.L;
                 break;
         }
-        connlibExt.IDAStarRecursively(this, this.endpoints[0].connGridE, this.endpoints[1].connGridE, direction);
+        let source = this.endpoints[0].connGridE;
+        let target = this.endpoints[1].connGridE;
+        this.pathPoints = connlibExt.IDAStar(source, target, direction);
+        for (var i = 1; i < this.pathPoints.length; i++) {
+            let source = this.pathPoints[i - 1];
+            let target = this.pathPoints[i];
+            source.connection = this;
+            target.connection = this;
+            let l = connlibLine.connect(source, target);
+            l.connection = this;
+            this.lines.push(l);
+        }
     }
-
+    /**
+     * the method enables user's to connect two points
+     * @param {*} source 
+     * @param {*} target 
+     */
     connect(source, target) {
+        this.endpoints = [];
         let endpoints = connlibExt.calcEndpointPosition(source, target);
         for (let e of endpoints) {
             e.connection = this;
             this.endpoints.push(e);
         }
     }
-
-    get pathString(){
+    /**
+     * the method returns whether the current connection is rendered or not
+     */
+    isRendered() {
+        return this._rendered;
+    }
+    /**
+     * the method returns the path's complete svg d string
+     */
+    get pathString() {
         var o = "";
-        for(var i = 0; i < this.pathPoints.length; i++){
-            if(i == 0){
+        for (var i = 0; i < this.pathPoints.length; i++) {
+            if (i == 0) {
                 o = "M" + this.pathPoints[i].c + " " + this.pathPoints[i].r;
             } else {
                 o += " L" + this.pathPoints[i].c + " " + this.pathPoints[i].r;
@@ -398,9 +358,108 @@ class connlibConnection extends connlibRenderable {
         }
         return o;
     }
+    /**
+     * the method renders the connection's path
+     */
+    render() {
+        if (this.isRendered()) this.clear();
+        for (let l of this.lines) l.render();
+        this._rendered = true;
+    }
 }
 
-class connlibEndpoint extends connlibRenderable {
+class connlibLine extends connlibAbstractRenderable {
+    hsvg;
+    lsvg;
+    type;
+    connection;
+    source;
+    target;
+    _rendered = false;
+    _initial = 0;
+    constructor() {
+        super();
+        connlibExt.overprintGuid(this, "guid");
+        connlib.instance._lines.push(this);
+    }
+    /**
+     * the method removes the element from the dom
+     */
+    clear() {
+        if (this._rendered) {
+            this.lsvg.parentNode.removeChild(this.lsvg);
+            this.hsvg.parentNode.removeChild(this.hsvg);
+            this._rendered = false;
+        }
+    }
+    static connect(s, t) {
+        let output = new connlibLine();
+        output.source = s;
+        output.target = t;
+        output.lsvg = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        output.lsvg.style.stroke = "#373737";
+        output.lsvg.style.strokeWidth = 1;
+        output.hsvg = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        output.hsvg.style.stroke = "transparent";
+        output.hsvg.style.strokeWidth = 20;
+        output.hsvg.style.zIndex = 5;
+        if (s.r == t.r) {
+            output.hsvg.classList.add("connlib-connection-hor");
+            output.type = this.lineType.HORIZONTAL;
+        }
+        else if (s.c == t.c) {
+            output.hsvg.classList.add("connlib-connection-ver");
+            output.type = this.lineType.VERTICAL;
+        }
+        output.lsvg.setAttribute("d", "M" + s.c + " " + s.r + " L" + t.c + " " + t.r);
+        output.hsvg.setAttribute("d", "M" + s.c + " " + s.r + " L" + t.c + " " + t.r);
+        console.log(s, t);
+        s.subscribePositionChange(() => output.updatePosition());
+        t.subscribePositionChange(() => output.updatePosition());
+        return output;
+    }
+    static lineType = { "HORIZONTAL": 1, "VERTICAL": 2 }
+    /**
+     * the method renders the current line
+     */
+    render() {
+        connlib.instance.container.appendChild(this.lsvg);
+        connlib.instance.container.appendChild(this.hsvg);
+        this.hsvg.addEventListener("mousedown", (event) => {
+            connlib.dragFlag = this;
+            switch (this.type) {
+                case connlibLine.lineType.HORIZONTAL:
+                    this._initial = event.offsetY;
+                    break;
+                case connlibLine.lineType.VERTICAL:
+                    this._initial = event.offsetX;
+                    break;
+            }
+        });
+        this.hsvg.addEventListener("mousemove", (event) => {
+            if (connlib.dragFlag == this) {
+                switch (this.type) {
+                    case connlibLine.lineType.HORIZONTAL:
+                        this.source.setTop(event.offsetY);
+                        this.target.setTop(event.offsetY);
+                        break;
+                    case connlibLine.lineType.VERTICAL:
+                        this.source.setLeft(event.offsetX);
+                        this.target.setLeft(event.offsetX);
+                        break;
+                }
+            }
+        });
+        this._rendered = true;
+    }
+
+    updatePosition() {
+        this.lsvg.setAttribute("d", "M" + this.source.c + " " + this.source.r + " L" + this.target.c + " " + this.target.r);
+        this.hsvg.setAttribute("d", "M" + this.source.c + " " + this.source.r + " L" + this.target.c + " " + this.target.r);
+    }
+}
+
+class connlibEndpoint extends connlibAbstractRenderable {
 
     source = null;
     connection = null;
@@ -408,6 +467,10 @@ class connlibEndpoint extends connlibRenderable {
     top = null;
     type = connlibEndpointType.DEFAULT;
     direction = null;
+    a = null; // rendered anchor point
+    p = null; // rendered, stagged anchor path
+
+    onPositionChangeHandlers = [];
 
     constructor(source, connection, positioning) {
         super();
@@ -420,6 +483,22 @@ class connlibEndpoint extends connlibRenderable {
             this.direction = positioning.direction;
         }
         connlib.instance._endpoints.push(this);
+        source.addEventListener("positionChange", (event) => {
+            console.log("update ", this, event);
+        });
+    }
+    /**
+     * the method removes the current enpoint from the dom
+     */
+    clear() {
+        if (this.a && this.p) {
+            this.a.parentNode.removeChild(this.a);
+            this.p.parentNode.removeChild(this.p);
+            this.a = null;
+            this.p = null;
+        } else {
+            console.warn("cannot remove endpoint from dom", this);
+        }
     }
 
     get connGridE() {
@@ -449,6 +528,143 @@ class connlibEndpoint extends connlibRenderable {
         var corrT = Math.ceil((this.top - parseFloat(bg.style.top)) / connlib.instance._gridScale) * connlib.instance._gridScale;
         return connlib.instance._internalGrid.cells[parseInt(corrT)][parseInt(corrL)];
     }
+    /**
+     * the method returns whether the current endpoint is rendered on the dom
+     */
+    isRendered() {
+        if (this.a && this.p) return true;
+        return false;
+    }
+    /**
+     * the method renders the current endpoint
+     */
+    render() {
+        if (this.isRendered()) this.clear();
+        let corrL = Math.ceil((this.left - parseFloat(connlib.instance.container.style.left)) / connlib.instance._gridScale) * connlib.instance._gridScale;
+        let corrT = Math.ceil((this.top - parseFloat(connlib.instance.container.style.top)) / connlib.instance._gridScale) * connlib.instance._gridScale;
+        switch (this.type) {
+            case connlibEndpointType.DEFAULT:
+                this.a = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                this.a.setAttribute("cx", corrL);
+                this.a.setAttribute("cy", corrT);
+                this.a.setAttribute("r", 5);
+                this.a.setAttribute("fill", "black");
+                this.p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                this.p.style.stroke = "#373737";
+                this.p.style.strokeWidth = 1;
+                switch (this.direction) {
+                    case connlibEdgeDirection.TOP:
+                        this.p.setAttribute("d", "M" + corrL + " " + corrT + " L" + corrL + " " + (corrT - connlib._endpointStag));
+                        break;
+                    case connlibEdgeDirection.RIGHT:
+                        this.p.setAttribute("d", "M" + corrL + " " + corrT + " L" + (corrL + connlib._endpointStag) + " " + corrT);
+                        break;
+                    case connlibEdgeDirection.BOTTOM:
+                        this.p.setAttribute("d", "M" + corrL + " " + corrT + " L" + corrL + " " + (corrT + connlib._endpointStag));
+                        break;
+                    case connlibEdgeDirection.LEFT:
+                        this.p.setAttribute("d", "M" + corrL + " " + corrT + " L" + (corrL - connlib._endpointStag) + " " + corrT);
+                        break;
+                }
+                break;
+            case connlibEndpointType.ARROW:
+                this.a = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                this.a.style.fill = "#373737";
+                this.a.style.strokeWidth = 1;
+                this.p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                this.p.style.stroke = "#373737";
+                this.p.style.strokeWidth = 1;
+                switch (this.direction) {
+                    case connlibEdgeDirection.TOP:
+                        this.a.setAttribute("points", corrL + "," + corrT + " " + (corrL - 10) + "," + (corrT - 20) + " " + (corrL + 10) + "," + (corrT - 20));
+                        this.p.setAttribute("d", "M" + corrL + " " + (corrT - 20) + " L" + corrL + " " + (corrT - connlib._endpointStag));
+                        break;
+                    case connlibEdgeDirection.RIGHT:
+                        this.a.setAttribute("points", corrL + "," + corrT + " " + (corrL + 20) + "," + (corrT + 10) + " " + (corrL + 20) + "," + (corrT - 10));
+                        this.p.setAttribute("d", "M" + (corrL + 20) + " " + corrT + " L" + (corrL + connlib._endpointStag) + " " + corrT);
+                        break;
+                    case connlibEdgeDirection.BOTTOM:
+                        this.a.setAttribute("points", corrL + "," + corrT + " " + (corrL + 10) + "," + (corrT + 20) + " " + (corrL - 10) + "," + (corrT + 20));
+                        this.p.setAttribute("d", "M" + corrL + " " + (corrT + 20) + " L" + corrL + " " + (corrT + connlib._endpointStag));
+                        break;
+                    case connlibEdgeDirection.LEFT:
+                        this.a.setAttribute("points", corrL + "," + corrT + " " + (corrL - 20) + "," + (corrT + 10) + " " + (corrL - 20) + "," + (corrT - 10));
+                        this.p.setAttribute("d", "M" + (corrL - 20) + " " + corrT + " L" + (corrL - connlib._endpointStag) + " " + corrT);
+                        break;
+                }
+                break;
+        }
+        if (this.a && this.p) {
+            connlib.instance.container.appendChild(this.a);
+            connlib.instance.container.appendChild(this.p);
+        }
+    }
+    /**
+     * the method updates the endpoint's left coordinate
+     */
+    setLeft(left) {
+        this.left = left;
+        if (this.isRendered()) {
+            this.render();
+            this.connection.calculatePath();
+            this.connection.render();
+        }
+        for (let e of this.onPositionChangeHandlers) e(this);
+    }
+    /**
+     * the method updates the endpoint's top coordinate
+     */
+    setTop(top) {
+        this.top = top;
+        if (this.isRendered()) {
+            this.render();
+            this.connection.calculatePath()
+            this.connection.render();
+        }
+        for (let e of this.onPositionChangeHandlers) e(this);
+    }
+
+    subscribePositionChange(handler) {
+        this.onPositionChangeHandlers.push(handler);
+    }
+}
+
+class connlibBreakPoint extends connlibAbstractRenderable {
+
+    connection = null;
+    lines = [];
+    c = null;
+    r = null;
+
+    onPositionChangeHandlers = [];
+
+    constructor(object) {
+        super();
+        connlibExt.overprintGuid(this, "guid");
+        connlib.instance._breakPoints.push(this);
+        this.c = object.c;
+        this.r = object.r;
+    }
+    /**
+     * the method updates the endpoint's left coordinate
+     */
+    setLeft(left) {
+        this.c = left;
+        for (let e of this.onPositionChangeHandlers) e(this);
+    }
+    /**
+     * the method updates the endpoint's top coordinate
+     */
+    setTop(top) {
+        this.r = top;
+        for (let e of this.onPositionChangeHandlers) e(this);
+    }
+    /**
+     * the method subscribes a position change handler
+     */
+    subscribePositionChange(handler) {
+        this.onPositionChangeHandlers.push(handler);
+    }
 }
 
 class connlibCanvas extends connlibAbstractRenderable {
@@ -475,9 +691,9 @@ class connlibGrid {
         this.width = width;
         this.height = height;
         this.scale = scale;
-        for (var r = 0; r < height; r+=scale) {
+        for (var r = 0; r < height; r += scale) {
             this.cells[r] = {};
-            for (var c = 0; c < width; c+=scale) {
+            for (var c = 0; c < width; c += scale) {
                 this.cells[r][c] = { "r": r, "c": c, "w": 1 };
             }
         }
@@ -760,224 +976,14 @@ class connlibExt {
         };
     }
 
-    static IDAStar(source, target, direction) {
-        console.log("start searching path: ", source, target);
-        let start = new Date().getTime();
-        var stack = {};
-        var threshold = this.manhattenDistance(source, target);
-        var path = [];
-        stack[threshold.toString()] = {};
-        stack[threshold.toString()][source.r] = source;
-        var found = false;
-        let max = 15000;
-        var i = 0;
-        var s = source;
-        s.d = direction;
-        s.p = 1;
-        path.push(s);
-        var collisionFlag = null;
-        while (!found) {
-            if (i == max) {
-                console.log(stack);
-                for (let dist in stack) {
-                    for (let row in stack[dist]) {
-                        if (stack[dist][row]) connlib.point(stack[dist][row], "red");
-                    }
-                }
-                throw ("maximum number of loops reached!");
-            }
-            let frontier = this.surroundingManhattenMinimumCells(s, target);
-            var next = null;
-            for (let c of frontier) {
-                if (!stack[c.d.toString()]) stack[c.d.toString()] = {};
-                if (!stack[c.d.toString()][c.o.r.toString()]) {
-                    stack[c.d.toString()][c.o.r.toString()] = c.o;
-                } else continue;
-                if (c.d < threshold) {
-                    threshold = c.d;
-                    if (collisionFlag) collisionFlag = null;
-                }
-                if (c.o.r == target.r && c.o.c == target.c) {
-                    found = true;
-                    stack[c.d.toString()][c.o.r.toString()].seq = i + 1;
-                    break;
-                }
-                if (c.d == threshold && c.o.d == direction) {
-                    if (s.r == c.o.r && s.c == c.o.c) {
-                        console.log(frontier);
-                        throw ("endless loop!");
-                    }
-                    next = c.o;
-                }
-            }
-
-            if (found) continue;
-            while (next == null) {
-                console.log("next is null");
-                for (let i in stack[threshold.toString()]) {
-                    if (stack[threshold.toString()][i].p != 1) {
-                        next = stack[threshold.toString()][i];
-                        console.log("setted next", next);
-                        break;
-                    }
-                }
-                while (collisionFlag) {
-                    if (!cI) var cI = connlib.instance._gridScale;
-                    switch (collisionFlag.d) {
-                        case connlibDir.T:
-                            if (connlib.instance._internalGrid.cells[collisionFlag.r + connlib.instance._gridScale][collisionFlag.c - cI].w) {
-                                for (let fI = connlib.instance._gridScale; fI < cI; fI+=connlib.instance._gridScale) {
-                                    let o = {
-                                        "c": (collisionFlag.c - fI),
-                                        "r": (collisionFlag.r),
-                                        "d": connlibDir.L
-                                    };
-                                    let d = this.manhattenDistance(o, target);
-                                    if (!stack[d]) stack[d.toString()] = {};
-                                    stack[d.toString()][(collisionFlag.r).toString()] = o;
-                                }
-                                next = { "c": (collisionFlag.c - cI), "r": (collisionFlag.r), "d": connlibDir.L };
-                            } else if (connlib.instance._internalGrid.cells[collisionFlag.r + connlib.instance._gridScale][collisionFlag.c + cI].w) {
-                                for (let fI = connlib.instance._gridScale; fI < cI; fI+=connlib.instance._gridScale) {
-                                    let o = {
-                                        "c": (collisionFlag.c + fI),
-                                        "r": (collisionFlag.r),
-                                        "d": connlibDir.R
-                                    };
-                                    let d = this.manhattenDistance(o, target);
-                                    if (!stack[d]) stack[d.toString()] = {};
-                                    stack[d.toString()][(collisionFlag.r).toString()] = o;
-                                }
-                                next = { "c": (collisionFlag.c + cI), "r": (collisionFlag.r), "d": connlibDir.R };
-                            }
-                            break;
-                        case connlibDir.B:
-                            try{
-                            if (connlib.instance._internalGrid.cells[collisionFlag.r + connlib.instance._gridScale][collisionFlag.c - cI].w) {
-                                for (let fI = connlib.instance._gridScale; fI < cI; fI+=connlib.instance._gridScale) {
-                                    let o = {
-                                        "c": (collisionFlag.c - fI),
-                                        "r": (collisionFlag.r),
-                                        "d": connlibDir.L
-                                    };
-                                    let d = this.manhattenDistance(o, target);
-                                    if (!stack[d]) stack[d.toString()] = {};
-                                    stack[d.toString()][(collisionFlag.r).toString()] = o;
-                                }
-                                next = { "c": (collisionFlag.c - cI), "r": (collisionFlag.r), "d": connlibDir.L };
-                            } else if (connlib.instance._internalGrid.cells[collisionFlag.r + connlib.instance._gridScale][collisionFlag.c + cI].w) {
-                                for (let fI = connlib.instance._gridScale; fI < cI; fI+=connlib.instance._gridScale) {
-                                    let o = {
-                                        "c": (collisionFlag.c + fI),
-                                        "r": (collisionFlag.r),
-                                        "d": connlibDir.R
-                                    };
-                                    let d = this.manhattenDistance(o, target);
-                                    if (!stack[d]) stack[d.toString()] = {};
-                                    stack[d.toString()][(collisionFlag.r).toString()] = o;
-                                }
-                                next = { "c": (collisionFlag.c + cI), "r": (collisionFlag.r), "d": connlibDir.R };
-                            }
-                            } catch(e){
-                                console.log(collisionFlag, collisionFlag.c - cI, cI);
-                                throw(e);
-                            }
-                            break;
-                        case connlibDir.R:
-                            if (connlib.instance._internalGrid.cells[collisionFlag.r - cI][collisionFlag.c + connlib.instance._gridScale].w) {
-                                for (let fI = connlib.instance._gridScale; fI < cI; fI+=connlib.instance._gridScale) {
-                                    let o = {
-                                        "c": (collisionFlag.c),
-                                        "r": (collisionFlag.r - fI),
-                                        "d": connlibDir.T
-                                    };
-                                    let d = this.manhattenDistance(o, target);
-                                    if (!stack[d]) stack[d.toString()] = {};
-                                    stack[d.toString()][(collisionFlag.r - cI).toString()] = o;
-                                }
-                                next = { "c": (collisionFlag.c), "r": (collisionFlag.r - cI), "d": connlibDir.T };
-                            } else if (connlib.instance._internalGrid.cells[collisionFlag.r + cI][collisionFlag.c + connlib.instance._gridScale].w) {
-                                for (let fI = connlib.instance._gridScale; fI < cI; fI+=connlib.instance._gridScale) {
-                                    let o = {
-                                        "c": (collisionFlag.c),
-                                        "r": (collisionFlag.r + fI),
-                                        "d": connlibDir.B
-                                    };
-                                    let d = this.manhattenDistance(o, target);
-                                    if (!stack[d]) stack[d.toString()] = {};
-                                    stack[d.toString()][(collisionFlag.r - cI).toString()] = o;
-                                }
-                                next = { "c": (collisionFlag.c), "r": (collisionFlag.r + cI), "d": connlibDir.B };
-                            }
-                            break;
-                        case connlibDir.L:
-                            if (connlib.instance._internalGrid.cells[collisionFlag.r - cI][collisionFlag.c + connlib.instance._gridScale].w) {
-                                for (let fI = connlib.instance._gridScale; fI < cI; fI+=connlib.instance._gridScale) {
-                                    let o = {
-                                        "c": (collisionFlag.c),
-                                        "r": (collisionFlag.r - fI),
-                                        "d": connlibDir.T
-                                    };
-                                    let d = this.manhattenDistance(o, target);
-                                    if (!stack[d]) stack[d.toString()] = {};
-                                    stack[d.toString()][(collisionFlag.r - cI).toString()] = o;
-                                }
-                                next = { "c": (collisionFlag.c), "r": (collisionFlag.r - cI), "d": connlibDir.T };
-
-                            } else if (connlib.instance._internalGrid.cells[collisionFlag.r + cI][collisionFlag.c + connlib.instance._gridScale].w) {
-                                for (let fI = connlib.instance._gridScale; fI < cI; fI+=connlib.instance._gridScale) {
-                                    let o = {
-                                        "c": (collisionFlag.c),
-                                        "r": (collisionFlag.r + fI),
-                                        "d": connlibDir.B
-                                    };
-                                    let d = this.manhattenDistance(o, target);
-                                    if (!stack[d]) stack[d.toString()] = {};
-                                    stack[d.toString()][(collisionFlag.r - cI).toString()] = o;
-                                }
-                                next = { "c": (collisionFlag.c), "r": (collisionFlag.r + cI), "d": connlibDir.B };
-
-                            }
-                            break;
-                    }
-                    if (next) {
-                        collisionFlag = null;
-                        let d = this.manhattenDistance(next, target);
-                        if (!stack[d]) stack[d.toString()] = {};
-                        stack[d.toString()][(next.r).toString()] = next;
-                        threshold = d;
-                    }
-                    cI+=connlib.instance._gridScale;
-                }
-                if (next == null && !collisionFlag) {
-                    collisionFlag = s;
-                    direction = collisionFlag.d;
-                    console.log(s);
-                    connlib.point(s);
-                }
-            }
-            if (s.d != next.d) {
-                path.push(s);
-            }
-            s = next;
-            if (!s) {
-                console.log(stack, c.o);
-                throw ("error: cannot find next node!");
-            }
-            s.p = 1;
-            s.seq = i;
-            i++;
-        }
-        path.push(target);
-        return {
-            path: path,
-            time: new Date().getTime() - start
-        };
-    }
-
+    /**
+     * the algorithm calculates the given connections path and renders the lines immediately
+     * @param {*} connection 
+     * @param {*} source 
+     * @param {*} target 
+     * @param {*} direction 
+     */
     static IDAStarRecursively(connection, source, target, direction) {
-        console.log("start searching path: ", source, target);
-        let start = new Date().getTime();
         var stack = {};
         var threshold = this.manhattenDistance(source, target);
         stack[threshold.toString()] = {};
@@ -1038,7 +1044,7 @@ class connlibExt {
                     switch (collisionFlag.d) {
                         case connlibDir.T:
                             if (connlib.instance._internalGrid.cells[collisionFlag.r + connlib.instance._gridScale][collisionFlag.c - cI].w) {
-                                for (let fI = connlib.instance._gridScale; fI < cI; fI+=connlib.instance._gridScale) {
+                                for (let fI = connlib.instance._gridScale; fI < cI; fI += connlib.instance._gridScale) {
                                     let o = {
                                         "c": (collisionFlag.c - fI),
                                         "r": (collisionFlag.r),
@@ -1046,11 +1052,11 @@ class connlibExt {
                                     };
                                     let d = this.manhattenDistance(o, target);
                                     if (!stack[d]) stack[d.toString()] = {};
-                                    stack[d.toString()][(collisionFlag.r).toString()] = o;
+                                    stack[d.toString()][o.r.toString()] = o;
                                 }
                                 next = { "c": (collisionFlag.c - cI), "r": (collisionFlag.r), "d": connlibDir.L };
                             } else if (connlib.instance._internalGrid.cells[collisionFlag.r + connlib.instance._gridScale][collisionFlag.c + cI].w) {
-                                for (let fI = connlib.instance._gridScale; fI < cI; fI+=connlib.instance._gridScale) {
+                                for (let fI = connlib.instance._gridScale; fI < cI; fI += connlib.instance._gridScale) {
                                     let o = {
                                         "c": (collisionFlag.c + fI),
                                         "r": (collisionFlag.r),
@@ -1058,15 +1064,14 @@ class connlibExt {
                                     };
                                     let d = this.manhattenDistance(o, target);
                                     if (!stack[d]) stack[d.toString()] = {};
-                                    stack[d.toString()][(collisionFlag.r).toString()] = o;
+                                    stack[d.toString()][o.r.toString()] = o;
                                 }
                                 next = { "c": (collisionFlag.c + cI), "r": (collisionFlag.r), "d": connlibDir.R };
                             }
                             break;
                         case connlibDir.B:
-                            try{
                             if (connlib.instance._internalGrid.cells[collisionFlag.r + connlib.instance._gridScale][collisionFlag.c - cI].w) {
-                                for (let fI = connlib.instance._gridScale; fI < cI; fI+=connlib.instance._gridScale) {
+                                for (let fI = connlib.instance._gridScale; fI < cI; fI += connlib.instance._gridScale) {
                                     let o = {
                                         "c": (collisionFlag.c - fI),
                                         "r": (collisionFlag.r),
@@ -1074,11 +1079,11 @@ class connlibExt {
                                     };
                                     let d = this.manhattenDistance(o, target);
                                     if (!stack[d]) stack[d.toString()] = {};
-                                    stack[d.toString()][(collisionFlag.r).toString()] = o;
+                                    stack[d.toString()][o.r.toString()] = o;
                                 }
                                 next = { "c": (collisionFlag.c - cI), "r": (collisionFlag.r), "d": connlibDir.L };
                             } else if (connlib.instance._internalGrid.cells[collisionFlag.r + connlib.instance._gridScale][collisionFlag.c + cI].w) {
-                                for (let fI = connlib.instance._gridScale; fI < cI; fI+=connlib.instance._gridScale) {
+                                for (let fI = connlib.instance._gridScale; fI < cI; fI += connlib.instance._gridScale) {
                                     let o = {
                                         "c": (collisionFlag.c + fI),
                                         "r": (collisionFlag.r),
@@ -1086,18 +1091,14 @@ class connlibExt {
                                     };
                                     let d = this.manhattenDistance(o, target);
                                     if (!stack[d]) stack[d.toString()] = {};
-                                    stack[d.toString()][(collisionFlag.r).toString()] = o;
+                                    stack[d.toString()][o.r.toString()] = o;
                                 }
                                 next = { "c": (collisionFlag.c + cI), "r": (collisionFlag.r), "d": connlibDir.R };
-                            }
-                            } catch(e){
-                                console.log(collisionFlag, collisionFlag.c - cI, cI);
-                                throw(e);
                             }
                             break;
                         case connlibDir.R:
                             if (connlib.instance._internalGrid.cells[collisionFlag.r - cI][collisionFlag.c + connlib.instance._gridScale].w) {
-                                for (let fI = connlib.instance._gridScale; fI < cI; fI+=connlib.instance._gridScale) {
+                                for (let fI = connlib.instance._gridScale; fI < cI; fI += connlib.instance._gridScale) {
                                     let o = {
                                         "c": (collisionFlag.c),
                                         "r": (collisionFlag.r - fI),
@@ -1105,11 +1106,11 @@ class connlibExt {
                                     };
                                     let d = this.manhattenDistance(o, target);
                                     if (!stack[d]) stack[d.toString()] = {};
-                                    stack[d.toString()][(collisionFlag.r - cI).toString()] = o;
+                                    stack[d.toString()][o.r.toString()] = o;
                                 }
                                 next = { "c": (collisionFlag.c), "r": (collisionFlag.r - cI), "d": connlibDir.T };
                             } else if (connlib.instance._internalGrid.cells[collisionFlag.r + cI][collisionFlag.c + connlib.instance._gridScale].w) {
-                                for (let fI = connlib.instance._gridScale; fI < cI; fI+=connlib.instance._gridScale) {
+                                for (let fI = connlib.instance._gridScale; fI < cI; fI += connlib.instance._gridScale) {
                                     let o = {
                                         "c": (collisionFlag.c),
                                         "r": (collisionFlag.r + fI),
@@ -1117,14 +1118,14 @@ class connlibExt {
                                     };
                                     let d = this.manhattenDistance(o, target);
                                     if (!stack[d]) stack[d.toString()] = {};
-                                    stack[d.toString()][(collisionFlag.r - cI).toString()] = o;
+                                    stack[d.toString()][o.r.toString()] = o;
                                 }
                                 next = { "c": (collisionFlag.c), "r": (collisionFlag.r + cI), "d": connlibDir.B };
                             }
                             break;
                         case connlibDir.L:
                             if (connlib.instance._internalGrid.cells[collisionFlag.r - cI][collisionFlag.c + connlib.instance._gridScale].w) {
-                                for (let fI = connlib.instance._gridScale; fI < cI; fI+=connlib.instance._gridScale) {
+                                for (let fI = connlib.instance._gridScale; fI < cI; fI += connlib.instance._gridScale) {
                                     let o = {
                                         "c": (collisionFlag.c),
                                         "r": (collisionFlag.r - fI),
@@ -1132,12 +1133,12 @@ class connlibExt {
                                     };
                                     let d = this.manhattenDistance(o, target);
                                     if (!stack[d]) stack[d.toString()] = {};
-                                    stack[d.toString()][(collisionFlag.r - cI).toString()] = o;
+                                    stack[d.toString()][o.r.toString()] = o;
                                 }
                                 next = { "c": (collisionFlag.c), "r": (collisionFlag.r - cI), "d": connlibDir.T };
 
                             } else if (connlib.instance._internalGrid.cells[collisionFlag.r + cI][collisionFlag.c + connlib.instance._gridScale].w) {
-                                for (let fI = connlib.instance._gridScale; fI < cI; fI+=connlib.instance._gridScale) {
+                                for (let fI = connlib.instance._gridScale; fI < cI; fI += connlib.instance._gridScale) {
                                     let o = {
                                         "c": (collisionFlag.c),
                                         "r": (collisionFlag.r + fI),
@@ -1145,7 +1146,7 @@ class connlibExt {
                                     };
                                     let d = this.manhattenDistance(o, target);
                                     if (!stack[d]) stack[d.toString()] = {};
-                                    stack[d.toString()][(collisionFlag.r - cI).toString()] = o;
+                                    stack[d.toString()][o.r.toString()] = o;
                                 }
                                 next = { "c": (collisionFlag.c), "r": (collisionFlag.r + cI), "d": connlibDir.B };
 
@@ -1159,7 +1160,7 @@ class connlibExt {
                         stack[d.toString()][(next.r).toString()] = next;
                         threshold = d;
                     }
-                    cI+=connlib.instance._gridScale;
+                    cI += connlib.instance._gridScale;
                 }
                 if (next == null && !collisionFlag) {
                     collisionFlag = s;
@@ -1179,9 +1180,101 @@ class connlibExt {
             i++;
         }
         connection.addPoint(target);
-        console.log("FINISHED: (ms) " + (new Date().getTime() - start));
     }
+    /**
+     * the algorithm calculates the given connections path and renders the lines immediately
+     * @param {*} connection 
+     * @param {*} source 
+     * @param {*} target 
+     * @param {*} direction 
+     */
+    static IDAStar(source, target, direction) {
+        var costs = {}
+        var stack = {};
+        var threshold = this.manhattenDistance(source, target);
+        stack[threshold.toString()] = {};
+        stack[threshold.toString()][source.r] = source;
+        var found = false;
+        let max = 5000;
+        var i = 0;
+        var s = source;
+        s.d = direction;
+        s.p = 1;
+        s.a = [];
+        var collisionFlag = null;
+        while (!found) {
+            if (i == max) {
+                console.log(stack);
+                for (let dist in stack) {
+                    for (let row in stack[dist]) {
+                        if (stack[dist][row]) connlib.point(stack[dist][row], "red");
+                    }
+                }
+                throw ("maximum number of loops reached!");
+            }
+            let frontier = this.surroundingManhattenMinimumCells(s, target);
+            var next = null;
+            for (let c of frontier) {
+                if (!stack[c.d.toString()]) stack[c.d.toString()] = {};
+                if (!stack[c.d.toString()][c.o.r.toString()]) {
+                    stack[c.d.toString()][c.o.r.toString()] = c.o;
+                } else continue;
+                if (c.d < threshold) {
+                    threshold = c.d;
+                    if (collisionFlag) collisionFlag = null;
+                }
+                if (c.o.r == target.r && c.o.c == target.c) {
+                    found = true;
+                    stack[c.d.toString()][c.o.r.toString()].seq = i + 1;
+                    this.updateCostsAndGetAnchestors(costs, s);
+                    let path = this.updateCostsAndGetAnchestors(costs, target);
+                    let breakPoints = [];
+                    for (let pI in path) {
+                        if (pI == 0) {
+                            breakPoints.push(new connlibBreakPoint(path[pI]));
+                        } else {
+                            if (path[pI - 1].d != path[pI].d) breakPoints.push(new connlibBreakPoint(path[pI - 1]));
+                        }
+                    }
+                    breakPoints.push(new connlibBreakPoint(target));
+                    return breakPoints;
+                }
+                if (c.d == threshold && c.o.d == direction) {
+                    if (s.r == c.o.r && s.c == c.o.c) {
+                        console.log(frontier);
+                        throw ("endless loop!");
+                    }
+                    next = c.o;
+                }
+            }
 
+            if (found) continue;
+
+            var i2 = 0;
+            while (next == null) {
+                if (i2 > max) throw ("infinity loop");
+                for (let i in stack[threshold.toString()]) {
+                    if (stack[threshold.toString()][i].p != 1) {
+                        next = stack[threshold.toString()][i];
+                        break;
+                    }
+                }
+                if (next == null) {
+                    threshold++;
+                }
+                i2++;
+            }
+            next.a = this.updateCostsAndGetAnchestors(costs, s);
+            s = next;
+            if (!s) {
+                console.log(stack, c.o);
+                throw ("error: cannot find next node!");
+            }
+            s.p = 1;
+            s.seq = i;
+            i++;
+        }
+    }
     /**
      * OLD VERSION - NOT WORKING PROPERLY
      * @param {*} source 
@@ -1293,6 +1386,78 @@ class connlibExt {
             this.guidMap[guid] = instance;
             return instance;
         }
+    }
+    /**
+     * the method calculates the costs for the anchestors
+     * @param {*} costs 
+     * @param {*} currentNode 
+     */
+    static updateCostsAndGetAnchestors(costs, currentNode) {
+        var cost = Infinity;
+        var a = null;
+        if (costs[(currentNode.r - connlib.instance._gridScale).toString()] && costs[(currentNode.r - connlib.instance._gridScale).toString()][currentNode.c.toString()]) {
+            let oD = costs[(currentNode.r - connlib.instance._gridScale).toString()][currentNode.c.toString()].d;
+            if (oD == currentNode.d) {
+                if (costs[(currentNode.r - connlib.instance._gridScale).toString()][currentNode.c.toString()].cost < cost) {
+                    cost = costs[(currentNode.r - connlib.instance._gridScale).toString()][currentNode.c.toString()].cost;
+                    a = [...costs[(currentNode.r - connlib.instance._gridScale).toString()][currentNode.c.toString()].a, { r: currentNode.r - connlib.instance._gridScale, c: currentNode.c, d: oD }];
+                }
+            } else {
+                if ((costs[(currentNode.r - connlib.instance._gridScale).toString()][currentNode.c.toString()].cost + 1) < cost) {
+                    cost = costs[(currentNode.r - connlib.instance._gridScale).toString()][currentNode.c.toString()].cost + 1;
+                    a = [...costs[(currentNode.r - connlib.instance._gridScale).toString()][currentNode.c.toString()].a, { r: currentNode.r - connlib.instance._gridScale, c: currentNode.c, d: oD }];
+                }
+            }
+        }
+        if (costs[currentNode.r.toString()] && costs[currentNode.r.toString()][(currentNode.c + connlib.instance._gridScale).toString()]) {
+            let oD = costs[currentNode.r.toString()][(currentNode.c + connlib.instance._gridScale).toString()].d;
+            if (oD == currentNode.d) {
+                if (costs[currentNode.r.toString()][(currentNode.c + connlib.instance._gridScale).toString()].cost < cost) {
+                    cost = costs[currentNode.r.toString()][(currentNode.c + connlib.instance._gridScale).toString()].cost;
+                    a = [...costs[currentNode.r.toString()][(currentNode.c + connlib.instance._gridScale).toString()].a, { r: currentNode.r, c: currentNode.c + connlib.instance._gridScale, d: oD }];
+                }
+            } else {
+                if ((costs[currentNode.r.toString()][(currentNode.c + connlib.instance._gridScale).toString()].cost + 1) < cost) {
+                    cost = costs[currentNode.r.toString()][(currentNode.c + connlib.instance._gridScale).toString()].cost;
+                    a = [...costs[currentNode.r.toString()][(currentNode.c + connlib.instance._gridScale).toString()].a, { r: currentNode.r, c: currentNode.c + connlib.instance._gridScale, d: oD }];
+                }
+            }
+        }
+        if (costs[(currentNode.r + connlib.instance._gridScale).toString()] && costs[(currentNode.r + connlib.instance._gridScale).toString()][currentNode.c.toString()]) {
+            let oD = costs[(currentNode.r + connlib.instance._gridScale).toString()][currentNode.c.toString()].d;
+            if (oD == currentNode.d) {
+                if (costs[(currentNode.r + connlib.instance._gridScale).toString()][currentNode.c.toString()].cost < cost) {
+                    cost = costs[(currentNode.r + connlib.instance._gridScale).toString()][currentNode.c.toString()].cost;
+                    a = [...costs[(currentNode.r + connlib.instance._gridScale).toString()][currentNode.c.toString()].a, { r: currentNode.r + connlib.instance._gridScale, c: currentNode.c, d: oD }];
+                }
+            } else {
+                if ((costs[(currentNode.r + connlib.instance._gridScale).toString()][currentNode.c.toString()].cost + 1) < cost) {
+                    cost = costs[(currentNode.r + connlib.instance._gridScale).toString()][currentNode.c.toString()].cost;
+                    a = [...costs[(currentNode.r + connlib.instance._gridScale).toString()][currentNode.c.toString()].a, { r: currentNode.r + connlib.instance._gridScale, c: currentNode.c, d: oD }];
+                }
+            }
+        }
+        if (costs[currentNode.r.toString()] && costs[currentNode.r.toString()][(currentNode.c - connlib.instance._gridScale).toString()]) {
+            let oD = costs[currentNode.r.toString()][(currentNode.c - connlib.instance._gridScale).toString()].d;
+            if (oD == currentNode.d) {
+                if (costs[currentNode.r.toString()][(currentNode.c - connlib.instance._gridScale).toString()].cost < cost) {
+                    cost = costs[currentNode.r.toString()][(currentNode.c - connlib.instance._gridScale).toString()].cost;
+                    a = [...costs[currentNode.r.toString()][(currentNode.c - connlib.instance._gridScale).toString()].a, { r: currentNode.r, c: currentNode.c - connlib.instance._gridScale, d: oD }];
+                }
+            } else {
+                if ((costs[currentNode.r.toString()][(currentNode.c - connlib.instance._gridScale).toString()].cost + 1) < cost) {
+                    cost = costs[currentNode.r.toString()][(currentNode.c - connlib.instance._gridScale).toString()].cost;
+                    a = costs[currentNode.r.toString()][(currentNode.c - connlib.instance._gridScale).toString()].a;
+                    a = [...costs[currentNode.r.toString()][(currentNode.c - connlib.instance._gridScale).toString()].a, { r: currentNode.r, c: currentNode.c - connlib.instance._gridScale, d: oD }];
+                }
+            }
+        }
+        if (cost == Infinity) cost = 0;
+        if (a == null) a = [];
+        else a
+        if (!costs[currentNode.r.toString()]) costs[currentNode.r.toString()] = {};
+        costs[currentNode.r.toString()][currentNode.c.toString()] = { cost: cost, a: a, d: currentNode.d };
+        return a;
     }
 }
 
