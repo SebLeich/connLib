@@ -36,6 +36,8 @@ class connlib {
     _renderCellsNotWalkable = true;
     _gridCellsRendered = false;
 
+    container = null;
+
     // how far should the endpoints stand
     static _endpointStag = 30;
 
@@ -92,16 +94,13 @@ class connlib {
         }
     }
 
-    get container() {
-        return document.getElementById(this._containerId);
-    }
-
     get containerId() {
         return this._containerId;
     }
 
     set containerId(value) {
         this._containerId = value;
+        this.container = document.getElementById(value);
     }
 
     static createInstance() {
@@ -133,8 +132,37 @@ class connlib {
             }
             this.applyTransform();
         });
-        window.addEventListener("mouseup", (event) => {
-            console.log(event, this.dragFlag);
+        window.addEventListener("mousedown", (event) => {
+            if(this.dragFlag == null){
+                event.preventDefault();
+                event.stopPropagation();
+                this.dragFlag = new connlibPan(event.clientX, event.clientY, instance._moveX, instance._moveY);
+            }
+        });
+        window.addEventListener("mousemove", (event) => {
+            if(!this.dragFlag) return;
+            switch(this.dragFlag.constructor){
+                case connlibLine:
+                    switch (this.dragFlag.type) {
+                        case connlibLine.lineType.HORIZONTAL:
+                            this.dragFlag.source.setTop(event.clientY - parseFloat(connlib.instance.container.style.top));
+                            this.dragFlag.target.setTop(event.clientY - parseFloat(connlib.instance.container.style.top));
+                            break;
+                        case connlibLine.lineType.VERTICAL:
+                            this.dragFlag.source.setLeft(event.clientX - parseFloat(connlib.instance.container.style.left));
+                            this.dragFlag.target.setLeft(event.clientX - parseFloat(connlib.instance.container.style.left));
+                            break;
+                    }
+                    break;
+                case connlibPan:
+                    let t = this.dragFlag.calculateTransform(event.clientX, event.clientY);
+                    connlib.instance._moveX = t.x;
+                    connlib.instance._moveY = t.y;
+                    connlib.applyTransform();
+                    break;
+            }
+        });
+        window.addEventListener("mouseup", () => {
             this.dragFlag = null;
         });
         return instance;
@@ -238,6 +266,28 @@ class connlib {
                 }
             }
         }
+    }
+}
+/**
+ * the class binds a connlib pan event
+ */
+class connlibPan {
+    mouseX;
+    mouseY;
+    initialXTransform;
+    initialYTransform;
+    constructor(mouseX, mouseY, initialXTransform, initialYTransform){
+        this.mouseX = mouseX;
+        this.mouseY = mouseY;
+        this.initialXTransform = initialXTransform;
+        this.initialYTransform = initialYTransform;
+    }
+    /**
+     * the method returns the calculation
+     * @param {*} point 
+     */
+    calculateTransform(x, y){
+        return { x: (this.initialXTransform + (x - this.mouseX)) * 1, y: (this.initialYTransform + (y - this.mouseY)) * 1 };
     }
 }
 /**
@@ -401,7 +451,7 @@ class connlibLine extends connlibAbstractRenderable {
         output.lsvg.style.strokeWidth = 1;
         output.hsvg = document.createElementNS("http://www.w3.org/2000/svg", "path");
         output.hsvg.style.stroke = "transparent";
-        output.hsvg.style.strokeWidth = 20;
+        output.hsvg.style.strokeWidth = 10;
         output.hsvg.style.zIndex = 5;
         if (s.r == t.r) {
             output.hsvg.classList.add("connlib-connection-hor");
@@ -413,7 +463,6 @@ class connlibLine extends connlibAbstractRenderable {
         }
         output.lsvg.setAttribute("d", "M" + s.c + " " + s.r + " L" + t.c + " " + t.r);
         output.hsvg.setAttribute("d", "M" + s.c + " " + s.r + " L" + t.c + " " + t.r);
-        console.log(s, t);
         s.subscribePositionChange(() => output.updatePosition());
         t.subscribePositionChange(() => output.updatePosition());
         return output;
@@ -426,6 +475,8 @@ class connlibLine extends connlibAbstractRenderable {
         connlib.instance.container.appendChild(this.lsvg);
         connlib.instance.container.appendChild(this.hsvg);
         this.hsvg.addEventListener("mousedown", (event) => {
+            event.stopPropagation();
+            event.preventDefault();
             connlib.dragFlag = this;
             switch (this.type) {
                 case connlibLine.lineType.HORIZONTAL:
@@ -434,20 +485,6 @@ class connlibLine extends connlibAbstractRenderable {
                 case connlibLine.lineType.VERTICAL:
                     this._initial = event.offsetX;
                     break;
-            }
-        });
-        this.hsvg.addEventListener("mousemove", (event) => {
-            if (connlib.dragFlag == this) {
-                switch (this.type) {
-                    case connlibLine.lineType.HORIZONTAL:
-                        this.source.setTop(event.offsetY);
-                        this.target.setTop(event.offsetY);
-                        break;
-                    case connlibLine.lineType.VERTICAL:
-                        this.source.setLeft(event.offsetX);
-                        this.target.setLeft(event.offsetX);
-                        break;
-                }
             }
         });
         this._rendered = true;
@@ -469,6 +506,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
     direction = null;
     a = null; // rendered anchor point
     p = null; // rendered, stagged anchor path
+    _connGridE = null;
 
     onPositionChangeHandlers = [];
 
@@ -488,21 +526,17 @@ class connlibEndpoint extends connlibAbstractRenderable {
         });
     }
     /**
-     * the method removes the current enpoint from the dom
+     *  the method returns the endpoint's connectable endpoint
      */
-    clear() {
-        if (this.a && this.p) {
-            this.a.parentNode.removeChild(this.a);
-            this.p.parentNode.removeChild(this.p);
-            this.a = null;
-            this.p = null;
-        } else {
-            console.warn("cannot remove endpoint from dom", this);
-        }
+    get connGridE(){
+        if(!this._connGridE) this.calculateCGridE();
+        return this._connGridE;
     }
-
-    get connGridE() {
-        let bg = document.getElementById("background-grid");
+    /**
+     * the method calculates the endpoint's connectable endpoint
+     */
+    calculateCGridE(){
+        let bg = connlib.instance.container;
         var corrL = Math.ceil((this.left - parseFloat(bg.style.left)) / connlib.instance._gridScale) * connlib.instance._gridScale;
         var corrT = Math.ceil((this.top - parseFloat(bg.style.top)) / connlib.instance._gridScale) * connlib.instance._gridScale;
         switch (this.direction) {
@@ -519,7 +553,20 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 corrL -= connlib._endpointStag;
                 break;
         }
-        return connlib.instance._internalGrid.cells[parseInt(corrT)][parseInt(corrL)];
+        this._connGridE = connlib.instance._internalGrid.cells[parseInt(corrT)][parseInt(corrL)];
+    }
+    /**
+     * the method removes the current enpoint from the dom
+     */
+    clear() {
+        if (this.a && this.p) {
+            this.a.parentNode.removeChild(this.a);
+            this.p.parentNode.removeChild(this.p);
+            this.a = null;
+            this.p = null;
+        } else {
+            console.warn("cannot remove endpoint from dom", this);
+        }
     }
 
     get gridE() {
