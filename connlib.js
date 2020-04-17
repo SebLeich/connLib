@@ -54,15 +54,8 @@ class connlib {
      * the method applys the transform to all contents
      */
     static applyTransform() {
-        let elements = document.getElementsByClassName("connlib-element");
-        for (let element of elements) {
-            element.style.transform = "translate(" + this._instance._moveX + "px, " + this._instance._moveY + "px)";
-        }
-        let endpoints = document.getElementsByClassName("endpoint-svg");
-        for (let endpoint of endpoints) {
-            endpoint.style.transform = "translate(" + this._instance._moveX + "px, " + this._instance._moveY + "px)";
-        }
-        this.instance.updateGrid();
+        document.getElementById("body").style.transform = "translate(" + this._instance._moveX + "px, " + this._instance._moveY + "px)";
+        //this.instance.updateGrid();
     }
     /**
      * the method clears the background svg
@@ -154,12 +147,12 @@ class connlib {
                 case connlibLine:
                     switch (this.dragFlag.type) {
                         case connlibLine.lineType.HORIZONTAL:
-                            this.dragFlag.source.setTop(event.clientY - parseFloat(connlib.instance.container.style.top));
-                            this.dragFlag.target.setTop(event.clientY - parseFloat(connlib.instance.container.style.top));
+                            this.dragFlag.source.setTop(event.offsetY);
+                            this.dragFlag.target.setTop(event.offsetY);
                             break;
                         case connlibLine.lineType.VERTICAL:
-                            this.dragFlag.source.setLeft(event.clientX - parseFloat(connlib.instance.container.style.left));
-                            this.dragFlag.target.setLeft(event.clientX - parseFloat(connlib.instance.container.style.left));
+                            this.dragFlag.source.setLeft(event.offsetX);
+                            this.dragFlag.target.setLeft(event.offsetX);
                             break;
                     }
                     break;
@@ -205,16 +198,43 @@ class connlib {
     /**
      * the method melts two points, drops one of them and connects all connections of the removed with the leaved
      */
-    static meltBreakPoints(p1, p2){
-        if(!p1._isEP){
-            for(let l of p1.lines) l.replaceBreakPoint(p1, p2);
-            p1.remove();
-        } else if(!p2._isEP){
-            for(let l of p2.lines) l.replaceBreakPoint(p2, p1);
-            p2.remove();
-        } else {
-            console.warn("something went wrong: cannot melt two endpoint breakpoints");
+    static meltBreakPoints(p1, p2, direction) {
+        var f = false;
+        let ls = [];
+        while (!f) {
+            let l = p1.lines.find(x => !ls.includes(x) && x.type == direction);
+            if (!l) f = true;
+            else {
+                ls.push(l);
+                if (l.source == p1) p1 = l.target;
+                p1 = l.source;
+            }
         }
+        f = false;
+        while (!f) {
+            let l = p2.lines.find(x => !ls.includes(x) && x.type == direction);
+            if (!l) f = true;
+            else {
+                ls.push(l);
+                if (l.source == p2) p2 = l.target;
+                p2 = l.source;
+            }
+        }
+        if(ls.includes(connlib.dragFlag)){
+            let n = connlib.dragFlag;
+            console.log(n);
+            n.replaceBreakPoints(p1, p2);
+            return true;
+        }
+        console.log(ls);
+        return false;
+        /*
+        let n = connlibLine.connect(p1, p2);
+        n.connection = p1.connection;
+        n.connection.lines.push(n);
+        n.render();
+        */
+        //return n;
     }
 
     static point(point, color) {
@@ -235,10 +255,6 @@ class connlib {
             c.calculatePath();
             c.render();
         }
-    }
-
-    staggedEndpoint() {
-
     }
 
     toggleRenderBlockingCells() {
@@ -463,7 +479,9 @@ class connlibLine extends connlibAbstractRenderable {
             this._rendered = false;
         }
     }
-
+    /**
+     * the method connects two breakpoints
+     */
     static connect(s, t) {
         let output = new connlibLine();
         output.source = s;
@@ -477,40 +495,36 @@ class connlibLine extends connlibAbstractRenderable {
         output.hsvg.style.stroke = "transparent";
         output.hsvg.style.strokeWidth = 10;
         output.hsvg.style.zIndex = 5;
-        if (s.r == t.r) {
-            output.hsvg.classList.add("connlib-connection-hor");
-            output.type = this.lineType.HORIZONTAL;
-        }
-        else if (s.c == t.c) {
-            output.hsvg.classList.add("connlib-connection-ver");
-            output.type = this.lineType.VERTICAL;
-        }
+        output.updateType();
         output.lsvg.setAttribute("d", "M" + s.c + " " + s.r + " L" + t.c + " " + t.r);
         output.hsvg.setAttribute("d", "M" + s.c + " " + s.r + " L" + t.c + " " + t.r);
-        s.subscribePositionChange(() => output.updatePosition());
-        t.subscribePositionChange(() => output.updatePosition());
+        s.subscribePositionChange((point, fun, dir) => output.updatePosition(dir));
+        t.subscribePositionChange((point, fun, dir) => output.updatePosition(dir));
         return output;
     }
     /**
      * the method calculates the line's length
      */
-    get length(){
+    get length() {
         return connlibExt.eukDist(this.source, this.target);
     }
-
+    /**
+     * the constant contains all available line types
+     */
     static lineType = { "HORIZONTAL": 1, "VERTICAL": 2 }
     /**
      * the method removes the instance from the current data model
      */
-    remove(){
+    remove() {
         let sI = this.source.lines.indexOf(this);
-        if(sI > -1) this.source.lines.splice(sI, 1);
+        if (sI > -1) this.source.lines.splice(sI, 1);
         let tI = this.target.lines.indexOf(this);
-        if(tI > -1) this.target.lines.splice(tI, 1);
+        if (tI > -1) this.target.lines.splice(tI, 1);
         let cI = this.connection.lines.indexOf(this);
-        if(cI > -1) this.connection.lines.splice(cI, 1);
+        if (cI > -1) this.connection.lines.splice(cI, 1);
         let lI = connlib.instance._lines.indexOf(this);
-        if(lI > -1) connlib.instance._lines.splice(lI, 1);
+        if (lI > -1) connlib.instance._lines.splice(lI, 1);
+        if(connlib.dragFlag == this) connlib.dragFlag = null;
         this.clear();
     }
     /**
@@ -541,14 +555,12 @@ class connlibLine extends connlibAbstractRenderable {
     }
     /**
      * the method replaces a line's breakpoint p1 with another breakpoint p2
-     * @param {*} p1 
-     * @param {*} p2 
      */
-    replaceBreakPoint(p1, p2){
-        if(this.source == p1){
+    replaceBreakPoint(p1, p2) {
+        if (this.source == p1) {
             this.source = p2;
             this.updatePosition();
-        } else if(this.target == p1){
+        } else if (this.target == p1) {
             this.target = p2;
             this.updatePosition();
         } else {
@@ -556,16 +568,53 @@ class connlibLine extends connlibAbstractRenderable {
         }
     }
     /**
+     * the method replaces both breakpoints
+     */
+    replaceBreakPoints(source, target) {
+        this.source = source;
+        this.target = target;
+        this.updateType();
+        this.lsvg.setAttribute("d", "M" + this.source.c + " " + this.source.r + " L" + this.target.c + " " + this.target.r);
+        this.hsvg.setAttribute("d", "M" + this.source.c + " " + this.source.r + " L" + this.target.c + " " + this.target.r);
+        this.source.subscribePositionChange((point, fun, dir) => this.updatePosition(dir));
+        this.target.subscribePositionChange((point, fun, dir) => this.updatePosition(dir));
+    }
+    /**
+     * the method analysis the current line's type
+     */
+    updateType(){
+        if (this.source.r == this.target.r) {
+            this.hsvg.classList.add("connlib-connection-hor");
+            this.hsvg.classList.remove("connlib-connection-ver");
+            this.type = connlibLine.lineType.HORIZONTAL;
+        }
+        else if (this.source.c == this.target.c) {
+            this.hsvg.classList.add("connlib-connection-ver");
+            this.hsvg.classList.remove("connlib-connection-hor");
+            this.type = connlibLine.lineType.VERTICAL;
+        } else {
+            console.warn("line with wrong points detected! GUID: " + this.guid);
+        }
+    }
+    /**
      * the method updates the current line and drops it if necessary
      */
-    updatePosition() {
-        if(this.length < 2){
+    updatePosition(direction) {
+        if (this.length == 0 && direction) {
             this.remove();
-            connlib.meltBreakPoints(this.source, this.target);
-        } else {
-            this.lsvg.setAttribute("d", "M" + this.source.c + " " + this.source.r + " L" + this.target.c + " " + this.target.r);
-            this.hsvg.setAttribute("d", "M" + this.source.c + " " + this.source.r + " L" + this.target.c + " " + this.target.r);
+            var abort = true;
+            switch (direction) {
+                case connlibLine.lineType.HORIZONTAL:
+                    abort = connlib.meltBreakPoints(this.source, this.target, connlibLine.lineType.VERTICAL);
+                    break;
+                case connlibLine.lineType.HORIZONTAL:
+                    abort = connlib.meltBreakPoints(this.source, this.target, connlibLine.lineType.HORIZONTAL);
+                    break;
+            }
+            if(abort) return;
         }
+        this.lsvg.setAttribute("d", "M" + this.source.c + " " + this.source.r + " L" + this.target.c + " " + this.target.r);
+        this.hsvg.setAttribute("d", "M" + this.source.c + " " + this.source.r + " L" + this.target.c + " " + this.target.r);
     }
 }
 
@@ -588,6 +637,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
         super();
         connlibExt.overprintGuid(this, "guid");
         this.svg.classList.add("endpoint-svg");
+        this.svg.addEventListener("dblclick", () => console.log(this));
         if (source) this.source = source;
         if (connection) this.connection = connection;
         if (positioning) {
@@ -705,29 +755,28 @@ class connlibEndpoint extends connlibAbstractRenderable {
      */
     reference() {
         let p = new connlibBreakPoint(this._connGridE);
-        p._isEP = true;
-        p.subscribeBeforePositionChange((newPos,abort) => {
+        p.subscribeBeforePositionChange((newPos, abort) => {
             switch (this.direction) {
                 case connlibEdgeDirection.TOP:
-                    if(newPos.top>this._connGridE.r)abort.v=true;
+                    if (newPos.top > this._connGridE.r) abort.v = true;
                     break;
                 case connlibEdgeDirection.RIGHT:
-                    if(newPos.left<this._connGridE.c)abort.v=true;
+                    if (newPos.left < this._connGridE.c) abort.v = true;
                     break;
                 case connlibEdgeDirection.BOTTOM:
-                    if(newPos.top<this._connGridE.r)abort.v=true;
+                    if (newPos.top < this._connGridE.r) abort.v = true;
                     break;
                 case connlibEdgeDirection.LEFT:
-                    if(newPos.left>this._connGridE.c)abort.v=true;
+                    if (newPos.left > this._connGridE.c) abort.v = true;
                     break;
             }
         });
-        p.subscribePositionChange((point,self) => {
+        p.subscribePositionChange((point, self) => {
             let r = this.calculateElementPointFromCGridE(point);
             switch (this.direction) {
                 case connlibEdgeDirection.TOP:
                     this.left = r.left;
-                    if(r.top<this._connGridE.r){
+                    if (r.top < this._connGridE.r) {
                         point.unsubscribePositionChange(self);
                         let ref = this.reference();
                         ref.connection = point.connection;
@@ -739,7 +788,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
                     break;
                 case connlibEdgeDirection.RIGHT:
                     this.top = r.top;
-                    if(r.left>this._connGridE.c){
+                    if (r.left > this._connGridE.c) {
                         point.unsubscribePositionChange(self);
                         let ref = this.reference();
                         ref.connection = point.connection;
@@ -751,7 +800,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
                     break;
                 case connlibEdgeDirection.BOTTOM:
                     this.left = r.left;
-                    if(r.top>this._connGridE.r){
+                    if (r.top > this._connGridE.r) {
                         point.unsubscribePositionChange(self);
                         let ref = this.reference();
                         ref.connection = point.connection;
@@ -763,7 +812,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
                     break;
                 case connlibEdgeDirection.LEFT:
                     this.top = r.top;
-                    if(r.left<this._connGridE.c){
+                    if (r.left < this._connGridE.c) {
                         point.unsubscribePositionChange(self);
                         let ref = this.reference();
                         ref.connection = point.connection;
@@ -847,7 +896,6 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 }
                 break;
         }
-        this.svg.style.transform = "translate(" + connlib.instance._moveX + "px, " + connlib.instance._moveY + "px)";
         document.getElementById("body").appendChild(this.svg);
         this.svg.appendChild(this.p);
         this._rendered = true;
@@ -862,7 +910,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
             this.connection.calculatePath();
             this.connection.render();
         }
-        for (let e of this.onPositionChangeHandlers) e(this,e);
+        for (let e of this.onPositionChangeHandlers) e(this, e, connlibLine.lineType.HORIZONTAL);
     }
     /**
      * the method updates the endpoint's top coordinate
@@ -874,17 +922,17 @@ class connlibEndpoint extends connlibAbstractRenderable {
             this.connection.calculatePath()
             this.connection.render();
         }
-        for (let e of this.onPositionChangeHandlers) e(this,e);
+        for (let e of this.onPositionChangeHandlers) e(this, e, connlibLine.lineType.VERTICAL);
     }
 
     subscribePositionChange(handler) {
         this.onPositionChangeHandlers.push(handler);
     }
 
-    unsubscribePositionChange(fun){
+    unsubscribePositionChange(fun) {
         let i = this.onPositionChangeHandlers.indexOf(fun);
-        if(i > -1){
-            this.onPositionChangeHandlers.splice(i,1);
+        if (i > -1) {
+            this.onPositionChangeHandlers.splice(i, 1);
         } else {
             console.warn("cannot unsubscribe function");
         }
@@ -897,7 +945,6 @@ class connlibBreakPoint extends connlibAbstractRenderable {
     lines = [];
     c = null;
     r = null;
-    _isEP = false;
 
     beforePositionChangeHandlers = [];
     onPositionChangeHandlers = [];
@@ -912,43 +959,43 @@ class connlibBreakPoint extends connlibAbstractRenderable {
     /**
      * the method returns the left coordinate of the point
      */
-    get left(){
+    get left() {
         return this.c;
     }
     /**
      * the method removes a breakpoint from the current data model
      */
-    remove(){
+    remove() {
         let cI = this.connection.pathPoints.indexOf(this);
-        if(cI > -1) this.connection.pathPoints.splice(cI, 1);
+        if (cI > -1) this.connection.pathPoints.splice(cI, 1);
         let i = connlib.instance._breakPoints.indexOf(this);
-        if(i > -1) connlib.instance._breakPoints.splice(i, 1);
+        if (i > -1) connlib.instance._breakPoints.splice(i, 1);
     }
     /**
      * the method updates the endpoint's left coordinate
      */
     setLeft(left) {
-        var abort = {v:false};
-        for (let e of this.beforePositionChangeHandlers) e({top:this.r,left:left}, abort);
-        if(abort.v) return false;
+        var abort = { v: false };
+        for (let e of this.beforePositionChangeHandlers) e({ top: this.r, left: left }, abort);
+        if (abort.v) return false;
         this.c = left;
-        for (let e of this.onPositionChangeHandlers) e(this,e);
+        for (let e of this.onPositionChangeHandlers) e(this, e, connlibLine.lineType.HORIZONTAL);
         return true;
     }
     /**
      * the method updates the endpoint's top coordinate
      */
     setTop(top) {
-        var abort = {v:false};
-        for (let e of this.beforePositionChangeHandlers) e({top:top,left:this.c}, abort);
-        if(abort.v) return false;
+        var abort = { v: false };
+        for (let e of this.beforePositionChangeHandlers) e({ top: top, left: this.c }, abort);
+        if (abort.v) return false;
         this.r = top;
-        for (let e of this.onPositionChangeHandlers) e(this,e);
+        for (let e of this.onPositionChangeHandlers) e(this, e, connlibLine.lineType.VERTICAL);
         return true;
     }
-     /**
-     * the method subscribes a before position change handler
-     */
+    /**
+    * the method subscribes a before position change handler
+    */
     subscribeBeforePositionChange(handler) {
         this.beforePositionChangeHandlers.push(handler);
     }
@@ -961,14 +1008,14 @@ class connlibBreakPoint extends connlibAbstractRenderable {
     /**
      * the method returns the top coordinate of the point
      */
-    get top(){
+    get top() {
         return this.r;
     }
 
-    unsubscribePositionChange(fun){
+    unsubscribePositionChange(fun) {
         let i = this.onPositionChangeHandlers.indexOf(fun);
-        if(i > -1){
-            this.onPositionChangeHandlers.splice(i,1);
+        if (i > -1) {
+            this.onPositionChangeHandlers.splice(i, 1);
         } else {
             console.warn("cannot unsubscribe function");
         }
