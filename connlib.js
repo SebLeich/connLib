@@ -202,6 +202,20 @@ class connlib {
         }
         return o;
     }
+    /**
+     * the method melts two points, drops one of them and connects all connections of the removed with the leaved
+     */
+    static meltBreakPoints(p1, p2){
+        if(!p1._isEP){
+            for(let l of p1.lines) l.replaceBreakPoint(p1, p2);
+            p1.remove();
+        } else if(!p2._isEP){
+            for(let l of p2.lines) l.replaceBreakPoint(p2, p1);
+            p2.remove();
+        } else {
+            console.warn("something went wrong: cannot melt two endpoint breakpoints");
+        }
+    }
 
     static point(point, color) {
         let bg = this.instance.container;
@@ -449,6 +463,7 @@ class connlibLine extends connlibAbstractRenderable {
             this._rendered = false;
         }
     }
+
     static connect(s, t) {
         let output = new connlibLine();
         output.source = s;
@@ -476,7 +491,28 @@ class connlibLine extends connlibAbstractRenderable {
         t.subscribePositionChange(() => output.updatePosition());
         return output;
     }
+    /**
+     * the method calculates the line's length
+     */
+    get length(){
+        return connlibExt.eukDist(this.source, this.target);
+    }
+
     static lineType = { "HORIZONTAL": 1, "VERTICAL": 2 }
+    /**
+     * the method removes the instance from the current data model
+     */
+    remove(){
+        let sI = this.source.lines.indexOf(this);
+        if(sI > -1) this.source.lines.splice(sI, 1);
+        let tI = this.target.lines.indexOf(this);
+        if(tI > -1) this.target.lines.splice(tI, 1);
+        let cI = this.connection.lines.indexOf(this);
+        if(cI > -1) this.connection.lines.splice(cI, 1);
+        let lI = connlib.instance._lines.indexOf(this);
+        if(lI > -1) connlib.instance._lines.splice(lI, 1);
+        this.clear();
+    }
     /**
      * the method renders the current line
      */
@@ -496,12 +532,40 @@ class connlibLine extends connlibAbstractRenderable {
                     break;
             }
         });
+        this.hsvg.addEventListener("dblclick", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            console.log(this);
+        });
         this._rendered = true;
     }
-
+    /**
+     * the method replaces a line's breakpoint p1 with another breakpoint p2
+     * @param {*} p1 
+     * @param {*} p2 
+     */
+    replaceBreakPoint(p1, p2){
+        if(this.source == p1){
+            this.source = p2;
+            this.updatePosition();
+        } else if(this.target == p1){
+            this.target = p2;
+            this.updatePosition();
+        } else {
+            console.warn("something went wrong: the line is not connected to the given point");
+        }
+    }
+    /**
+     * the method updates the current line and drops it if necessary
+     */
     updatePosition() {
-        this.lsvg.setAttribute("d", "M" + this.source.c + " " + this.source.r + " L" + this.target.c + " " + this.target.r);
-        this.hsvg.setAttribute("d", "M" + this.source.c + " " + this.source.r + " L" + this.target.c + " " + this.target.r);
+        if(this.length < 2){
+            this.remove();
+            connlib.meltBreakPoints(this.source, this.target);
+        } else {
+            this.lsvg.setAttribute("d", "M" + this.source.c + " " + this.source.r + " L" + this.target.c + " " + this.target.r);
+            this.hsvg.setAttribute("d", "M" + this.source.c + " " + this.source.r + " L" + this.target.c + " " + this.target.r);
+        }
     }
 }
 
@@ -522,7 +586,6 @@ class connlibEndpoint extends connlibAbstractRenderable {
 
     constructor(source, connection, positioning) {
         super();
-        console.log(positioning);
         connlibExt.overprintGuid(this, "guid");
         this.svg.classList.add("endpoint-svg");
         if (source) this.source = source;
@@ -642,6 +705,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
      */
     reference() {
         let p = new connlibBreakPoint(this._connGridE);
+        p._isEP = true;
         p.subscribeBeforePositionChange((newPos,abort) => {
             switch (this.direction) {
                 case connlibEdgeDirection.TOP:
@@ -660,7 +724,6 @@ class connlibEndpoint extends connlibAbstractRenderable {
         });
         p.subscribePositionChange((point,self) => {
             let r = this.calculateElementPointFromCGridE(point);
-            console.log(point);
             switch (this.direction) {
                 case connlibEdgeDirection.TOP:
                     this.left = r.left;
@@ -834,6 +897,7 @@ class connlibBreakPoint extends connlibAbstractRenderable {
     lines = [];
     c = null;
     r = null;
+    _isEP = false;
 
     beforePositionChangeHandlers = [];
     onPositionChangeHandlers = [];
@@ -844,6 +908,21 @@ class connlibBreakPoint extends connlibAbstractRenderable {
         connlib.instance._breakPoints.push(this);
         this.c = object.c;
         this.r = object.r;
+    }
+    /**
+     * the method returns the left coordinate of the point
+     */
+    get left(){
+        return this.c;
+    }
+    /**
+     * the method removes a breakpoint from the current data model
+     */
+    remove(){
+        let cI = this.connection.pathPoints.indexOf(this);
+        if(cI > -1) this.connection.pathPoints.splice(cI, 1);
+        let i = connlib.instance._breakPoints.indexOf(this);
+        if(i > -1) connlib.instance._breakPoints.splice(i, 1);
     }
     /**
      * the method updates the endpoint's left coordinate
@@ -879,7 +958,13 @@ class connlibBreakPoint extends connlibAbstractRenderable {
     subscribePositionChange(handler) {
         this.onPositionChangeHandlers.push(handler);
     }
-    
+    /**
+     * the method returns the top coordinate of the point
+     */
+    get top(){
+        return this.r;
+    }
+
     unsubscribePositionChange(fun){
         let i = this.onPositionChangeHandlers.indexOf(fun);
         if(i > -1){
