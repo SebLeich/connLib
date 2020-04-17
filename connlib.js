@@ -21,6 +21,7 @@ class connlib {
     _endpoints = [];
     _breakPoints = [];
     _canvas = [];
+    static _gridScale = 10;
     _gridScale = 10;
     _renderGrid = false;
     _internalGrid;
@@ -38,8 +39,11 @@ class connlib {
 
     container = null;
 
-    // how far should the endpoints stand
-    static _endpointStag = 30;
+    // how far should the endpoints stand out?
+    static _endpointStag = 20;
+    // how big should the endpoints be?
+    static _endpointSizeThk = 20;
+    static _endpointSizeThn = 10;
 
     static dragFlag = null;
 
@@ -53,6 +57,10 @@ class connlib {
         let elements = document.getElementsByClassName("connlib-element");
         for (let element of elements) {
             element.style.transform = "translate(" + this._instance._moveX + "px, " + this._instance._moveY + "px)";
+        }
+        let endpoints = document.getElementsByClassName("endpoint-svg");
+        for (let endpoint of endpoints) {
+            endpoint.style.transform = "translate(" + this._instance._moveX + "px, " + this._instance._moveY + "px)";
         }
         this.instance.updateGrid();
     }
@@ -110,6 +118,7 @@ class connlib {
 
     static init(containerId) {
         let instance = this.createInstance();
+        this.applyTransform();
         instance.containerId = containerId;
         window.addEventListener("keyup", (event) => {
             switch (event.keyCode) {
@@ -133,15 +142,15 @@ class connlib {
             this.applyTransform();
         });
         window.addEventListener("mousedown", (event) => {
-            if(this.dragFlag == null){
+            if (this.dragFlag == null) {
                 event.preventDefault();
                 event.stopPropagation();
                 this.dragFlag = new connlibPan(event.clientX, event.clientY, instance._moveX, instance._moveY);
             }
         });
         window.addEventListener("mousemove", (event) => {
-            if(!this.dragFlag) return;
-            switch(this.dragFlag.constructor){
+            if (!this.dragFlag) return;
+            switch (this.dragFlag.constructor) {
                 case connlibLine:
                     switch (this.dragFlag.type) {
                         case connlibLine.lineType.HORIZONTAL:
@@ -256,10 +265,10 @@ class connlib {
         let blocks = document.getElementsByClassName("connlib-block");
         for (let element of blocks) {
             let rect = element.getBoundingClientRect();
-            let left = parseInt((rect.left - parseFloat(bg.style.left)));
-            let right = parseInt((rect.right - parseFloat(bg.style.left)));
-            let top = parseInt((rect.top - parseFloat(bg.style.top)));
-            let bottom = parseInt((rect.bottom - parseFloat(bg.style.top)));
+            let left = Math.ceil((rect.left - parseFloat(bg.style.left)) / this._gridScale) * this._gridScale;
+            let right = Math.ceil((rect.right - parseFloat(bg.style.left)) / this._gridScale) * this._gridScale;
+            let top = Math.ceil((rect.top - parseFloat(bg.style.top)) / this._gridScale) * this._gridScale;
+            let bottom = Math.ceil((rect.bottom - parseFloat(bg.style.top)) / this._gridScale) * this._gridScale;
             for (var r = top; r <= bottom; r += this._gridScale) {
                 for (var c = left; c <= right; c += this._gridScale) {
                     this._internalGrid.cells[r][c].w = 0;
@@ -276,7 +285,7 @@ class connlibPan {
     mouseY;
     initialXTransform;
     initialYTransform;
-    constructor(mouseX, mouseY, initialXTransform, initialYTransform){
+    constructor(mouseX, mouseY, initialXTransform, initialYTransform) {
         this.mouseX = mouseX;
         this.mouseY = mouseY;
         this.initialXTransform = initialXTransform;
@@ -286,7 +295,7 @@ class connlibPan {
      * the method returns the calculation
      * @param {*} point 
      */
-    calculateTransform(x, y){
+    calculateTransform(x, y) {
         return { x: (this.initialXTransform + (x - this.mouseX)) * 1, y: (this.initialYTransform + (y - this.mouseY)) * 1 };
     }
 }
@@ -362,15 +371,13 @@ class connlibConnection extends connlibAbstractRenderable {
                 direction = connlibDir.L;
                 break;
         }
-        let source = this.endpoints[0].connGridE;
-        let target = this.endpoints[1].connGridE;
-        this.pathPoints = connlibExt.IDAStar(source, target, direction);
+        this.pathPoints = connlibExt.IDAStar(this.endpoints[0], this.endpoints[1], direction);
         for (var i = 1; i < this.pathPoints.length; i++) {
-            let source = this.pathPoints[i - 1];
-            let target = this.pathPoints[i];
-            source.connection = this;
-            target.connection = this;
-            let l = connlibLine.connect(source, target);
+            let s = this.pathPoints[i - 1];
+            let t = this.pathPoints[i];
+            s.connection = this;
+            t.connection = this;
+            let l = connlibLine.connect(s, t);
             l.connection = this;
             this.lines.push(l);
         }
@@ -446,6 +453,8 @@ class connlibLine extends connlibAbstractRenderable {
         let output = new connlibLine();
         output.source = s;
         output.target = t;
+        s.lines.push(output);
+        t.lines.push(output);
         output.lsvg = document.createElementNS("http://www.w3.org/2000/svg", "path");
         output.lsvg.style.stroke = "#373737";
         output.lsvg.style.strokeWidth = 1;
@@ -497,22 +506,25 @@ class connlibLine extends connlibAbstractRenderable {
 }
 
 class connlibEndpoint extends connlibAbstractRenderable {
-
     source = null;
     connection = null;
     left = null;
     top = null;
-    type = connlibEndpointType.DEFAULT;
+    type = connlibEndpointType.ARROW;
     direction = null;
     a = null; // rendered anchor point
     p = null; // rendered, stagged anchor path
     _connGridE = null;
+    _rendered = false;
+    svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
 
     onPositionChangeHandlers = [];
 
     constructor(source, connection, positioning) {
         super();
+        console.log(positioning);
         connlibExt.overprintGuid(this, "guid");
+        this.svg.classList.add("endpoint-svg");
         if (source) this.source = source;
         if (connection) this.connection = connection;
         if (positioning) {
@@ -528,14 +540,14 @@ class connlibEndpoint extends connlibAbstractRenderable {
     /**
      *  the method returns the endpoint's connectable endpoint
      */
-    get connGridE(){
-        if(!this._connGridE) this.calculateCGridE();
+    get connGridE() {
+        if (!this._connGridE) this.calculateCGridE();
         return this._connGridE;
     }
     /**
      * the method calculates the endpoint's connectable endpoint
      */
-    calculateCGridE(){
+    calculateCGridE() {
         let bg = connlib.instance.container;
         var corrL = Math.ceil((this.left - parseFloat(bg.style.left)) / connlib.instance._gridScale) * connlib.instance._gridScale;
         var corrT = Math.ceil((this.top - parseFloat(bg.style.top)) / connlib.instance._gridScale) * connlib.instance._gridScale;
@@ -556,9 +568,52 @@ class connlibEndpoint extends connlibAbstractRenderable {
         this._connGridE = connlib.instance._internalGrid.cells[parseInt(corrT)][parseInt(corrL)];
     }
     /**
+     * the method calculates the endpoint element's endpoint from the connection point
+     */
+    calculateElementPointFromCGridE(point) {
+        let bg = connlib.instance.container;
+        var corrL = point.c + parseFloat(bg.style.left);
+        var corrT = point.r + parseFloat(bg.style.top);
+        switch (this.direction) {
+            case connlibEdgeDirection.TOP:
+                corrT -= connlib._endpointStag;
+                break;
+            case connlibEdgeDirection.RIGHT:
+                corrL += connlib._endpointStag;
+                break;
+            case connlibEdgeDirection.BOTTOM:
+                corrT += connlib._endpointStag;
+                break;
+            case connlibEdgeDirection.LEFT:
+                corrL -= connlib._endpointStag;
+                break;
+        }
+        return { top: corrT, left: corrL };
+    }
+    /**
+     * the method returns the endpoint's stagged line direction
+     */
+    get connlibLineDirection() {
+        switch (this.direction) {
+            case connlibEdgeDirection.TOP:
+            case connlibEdgeDirection.BOTTOM:
+                return connlibLine.lineType.VERTICAL;
+            case connlibEdgeDirection.RIGHT:
+            case connlibEdgeDirection.LEFT:
+                return connlibLine.lineType.HORIZONTAL;
+        }
+        return null;
+    }
+    /**
      * the method removes the current enpoint from the dom
      */
     clear() {
+        if (this.isRendered()) {
+            this.svg.innerHTML = "";
+            this.svg.parentNode.removeChild(this.svg);
+        }
+        this._rendered = false;
+        /*
         if (this.a && this.p) {
             this.a.parentNode.removeChild(this.a);
             this.p.parentNode.removeChild(this.p);
@@ -567,6 +622,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
         } else {
             console.warn("cannot remove endpoint from dom", this);
         }
+        */
     }
 
     get gridE() {
@@ -579,72 +635,159 @@ class connlibEndpoint extends connlibAbstractRenderable {
      * the method returns whether the current endpoint is rendered on the dom
      */
     isRendered() {
-        if (this.a && this.p) return true;
-        return false;
+        return this._rendered;
+    }
+    /**
+     * the method returns a reference break point
+     */
+    reference() {
+        let p = new connlibBreakPoint(this._connGridE);
+        p.subscribeBeforePositionChange((newPos,abort) => {
+            switch (this.direction) {
+                case connlibEdgeDirection.TOP:
+                    if(newPos.top>this._connGridE.r)abort.v=true;
+                    break;
+                case connlibEdgeDirection.RIGHT:
+                    if(newPos.left<this._connGridE.c)abort.v=true;
+                    break;
+                case connlibEdgeDirection.BOTTOM:
+                    if(newPos.top<this._connGridE.r)abort.v=true;
+                    break;
+                case connlibEdgeDirection.LEFT:
+                    if(newPos.left>this._connGridE.c)abort.v=true;
+                    break;
+            }
+        });
+        p.subscribePositionChange((point,self) => {
+            let r = this.calculateElementPointFromCGridE(point);
+            console.log(point);
+            switch (this.direction) {
+                case connlibEdgeDirection.TOP:
+                    this.left = r.left;
+                    if(r.top<this._connGridE.r){
+                        point.unsubscribePositionChange(self);
+                        let ref = this.reference();
+                        ref.connection = point.connection;
+                        let l = connlibLine.connect(point, ref);
+                        l.connection = point.connection;
+                        l.connection.lines.push(l);
+                        l.render();
+                    }
+                    break;
+                case connlibEdgeDirection.RIGHT:
+                    this.top = r.top;
+                    if(r.left>this._connGridE.c){
+                        point.unsubscribePositionChange(self);
+                        let ref = this.reference();
+                        ref.connection = point.connection;
+                        let l = connlibLine.connect(point, ref);
+                        l.connection = point.connection;
+                        l.connection.lines.push(l);
+                        l.render();
+                    }
+                    break;
+                case connlibEdgeDirection.BOTTOM:
+                    this.left = r.left;
+                    if(r.top>this._connGridE.r){
+                        point.unsubscribePositionChange(self);
+                        let ref = this.reference();
+                        ref.connection = point.connection;
+                        let l = connlibLine.connect(point, ref);
+                        l.connection = point.connection;
+                        l.connection.lines.push(l);
+                        l.render();
+                    }
+                    break;
+                case connlibEdgeDirection.LEFT:
+                    this.top = r.top;
+                    if(r.left<this._connGridE.c){
+                        point.unsubscribePositionChange(self);
+                        let ref = this.reference();
+                        ref.connection = point.connection;
+                        let l = connlibLine.connect(point, ref);
+                        l.connection = point.connection;
+                        l.connection.lines.push(l);
+                        l.render();
+                    }
+                    break;
+            }
+            this.render();
+        });
+        return p;
     }
     /**
      * the method renders the current endpoint
      */
     render() {
         if (this.isRendered()) this.clear();
-        let corrL = Math.ceil((this.left - parseFloat(connlib.instance.container.style.left)) / connlib.instance._gridScale) * connlib.instance._gridScale;
-        let corrT = Math.ceil((this.top - parseFloat(connlib.instance.container.style.top)) / connlib.instance._gridScale) * connlib.instance._gridScale;
+        this.p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        this.p.style.stroke = "#373737";
+        this.p.style.strokeWidth = 1;
+        let thkH = connlib._endpointSizeThk / 2;
+        var c = null; // pointer center
+        var f1 = null; // footer point 1
+        var f2 = null; // footer point 2
+        switch (this.direction) {
+            case connlibEdgeDirection.TOP:
+                this.svg.style.left = this.left - (connlib._endpointSizeThk / 2) + 1;
+                this.svg.style.top = this.top - connlib._endpointStag - 1;
+                this.svg.style.height = connlib._endpointSizeThn + connlib._endpointStag;
+                this.svg.style.width = connlib._endpointSizeThk;
+                this.svg.classList.add("connlib-estag-ver");
+                this.p.setAttribute("d", "M" + thkH + " " + connlib._endpointStag + " L" + thkH + " 0");
+                c = { x: thkH, y: (connlib._endpointStag) };
+                f1 = { x: 5, y: (connlib._endpointStag - connlib._endpointSizeThn) };
+                f2 = { x: (connlib._endpointSizeThk - 5), y: (connlib._endpointStag - connlib._endpointSizeThn) };
+                break;
+            case connlibEdgeDirection.RIGHT:
+                this.svg.style.left = this.left - connlib._endpointSizeThn + 1;
+                this.svg.style.top = this.top - (connlib._endpointSizeThk / 2) + 1;
+                this.svg.style.height = connlib._endpointSizeThk;
+                this.svg.style.width = connlib._endpointSizeThn + connlib._endpointStag;
+                this.svg.classList.add("connlib-estag-hor");
+                this.p.setAttribute("d", "M" + connlib._endpointSizeThn + " " + thkH + " L" + (connlib._endpointStag + connlib._endpointSizeThn) + " " + thkH);
+                c = { x: connlib._endpointSizeThn, y: thkH };
+                f1 = { x: (connlib._endpointSizeThn * 2), y: 5 };
+                f2 = { x: (connlib._endpointSizeThn * 2), y: (connlib._endpointSizeThk - 5) };
+                break;
+            case connlibEdgeDirection.BOTTOM:
+                this.svg.style.left = this.left - (connlib._endpointSizeThk / 2) + 1;
+                this.svg.style.top = this.top - (connlib._endpointSizeThn) + 1;
+                this.svg.style.height = connlib._endpointSizeThn + connlib._endpointStag;
+                this.svg.style.width = connlib._endpointSizeThk;
+                this.svg.classList.add("connlib-estag-ver");
+                this.p.setAttribute("d", "M" + thkH + " " + connlib._endpointSizeThn + " L" + thkH + " " + (connlib._endpointStag + connlib._endpointSizeThn));
+                c = { x: thkH, y: connlib._endpointSizeThn };
+                f1 = { x: 5, y: (connlib._endpointSizeThn * 2) };
+                f2 = { x: (connlib._endpointSizeThk - 5), y: (connlib._endpointSizeThn * 2) };
+                break;
+            case connlibEdgeDirection.LEFT:
+                this.svg.style.left = this.left - connlib._endpointStag + 1;
+                this.svg.style.top = this.top - (connlib._endpointSizeThk / 2) + 1;
+                this.svg.style.height = connlib._endpointSizeThk;
+                this.svg.style.width = connlib._endpointSizeThn + connlib._endpointStag;
+                this.svg.classList.add("connlib-estag-hor");
+                this.p.setAttribute("d", "M0 " + thkH + " L" + (connlib._endpointStag - 1) + " " + thkH);
+                c = { x: connlib._endpointStag, y: thkH };
+                f1 = { x: (connlib._endpointStag - connlib._endpointSizeThn), y: 5 };
+                f2 = { x: (connlib._endpointStag - connlib._endpointSizeThn), y: (connlib._endpointSizeThk - 5) };
+                break;
+        }
         switch (this.type) {
-            case connlibEndpointType.DEFAULT:
-                this.a = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-                this.a.setAttribute("cx", corrL);
-                this.a.setAttribute("cy", corrT);
-                this.a.setAttribute("r", 5);
-                this.a.setAttribute("fill", "black");
-                this.p = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                this.p.style.stroke = "#373737";
-                this.p.style.strokeWidth = 1;
-                switch (this.direction) {
-                    case connlibEdgeDirection.TOP:
-                        this.p.setAttribute("d", "M" + corrL + " " + corrT + " L" + corrL + " " + (corrT - connlib._endpointStag));
-                        break;
-                    case connlibEdgeDirection.RIGHT:
-                        this.p.setAttribute("d", "M" + corrL + " " + corrT + " L" + (corrL + connlib._endpointStag) + " " + corrT);
-                        break;
-                    case connlibEdgeDirection.BOTTOM:
-                        this.p.setAttribute("d", "M" + corrL + " " + corrT + " L" + corrL + " " + (corrT + connlib._endpointStag));
-                        break;
-                    case connlibEdgeDirection.LEFT:
-                        this.p.setAttribute("d", "M" + corrL + " " + corrT + " L" + (corrL - connlib._endpointStag) + " " + corrT);
-                        break;
-                }
-                break;
             case connlibEndpointType.ARROW:
-                this.a = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-                this.a.style.fill = "#373737";
-                this.a.style.strokeWidth = 1;
-                this.p = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                this.p.style.stroke = "#373737";
-                this.p.style.strokeWidth = 1;
-                switch (this.direction) {
-                    case connlibEdgeDirection.TOP:
-                        this.a.setAttribute("points", corrL + "," + corrT + " " + (corrL - 10) + "," + (corrT - 20) + " " + (corrL + 10) + "," + (corrT - 20));
-                        this.p.setAttribute("d", "M" + corrL + " " + (corrT - 20) + " L" + corrL + " " + (corrT - connlib._endpointStag));
-                        break;
-                    case connlibEdgeDirection.RIGHT:
-                        this.a.setAttribute("points", corrL + "," + corrT + " " + (corrL + 20) + "," + (corrT + 10) + " " + (corrL + 20) + "," + (corrT - 10));
-                        this.p.setAttribute("d", "M" + (corrL + 20) + " " + corrT + " L" + (corrL + connlib._endpointStag) + " " + corrT);
-                        break;
-                    case connlibEdgeDirection.BOTTOM:
-                        this.a.setAttribute("points", corrL + "," + corrT + " " + (corrL + 10) + "," + (corrT + 20) + " " + (corrL - 10) + "," + (corrT + 20));
-                        this.p.setAttribute("d", "M" + corrL + " " + (corrT + 20) + " L" + corrL + " " + (corrT + connlib._endpointStag));
-                        break;
-                    case connlibEdgeDirection.LEFT:
-                        this.a.setAttribute("points", corrL + "," + corrT + " " + (corrL - 20) + "," + (corrT + 10) + " " + (corrL - 20) + "," + (corrT - 10));
-                        this.p.setAttribute("d", "M" + (corrL - 20) + " " + corrT + " L" + (corrL - connlib._endpointStag) + " " + corrT);
-                        break;
+                if (c && f1 && f2) {
+                    this.a = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                    this.a.style.fill = "#373737";
+                    this.a.style.strokeWidth = 1;
+                    this.a.setAttribute("points", c.x + "," + c.y + " " + f1.x + "," + f1.y + " " + f2.x + "," + f2.y);
+                    this.svg.appendChild(this.a);
                 }
                 break;
         }
-        if (this.a && this.p) {
-            connlib.instance.container.appendChild(this.a);
-            connlib.instance.container.appendChild(this.p);
-        }
+        this.svg.style.transform = "translate(" + connlib.instance._moveX + "px, " + connlib.instance._moveY + "px)";
+        document.getElementById("body").appendChild(this.svg);
+        this.svg.appendChild(this.p);
+        this._rendered = true;
     }
     /**
      * the method updates the endpoint's left coordinate
@@ -656,7 +799,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
             this.connection.calculatePath();
             this.connection.render();
         }
-        for (let e of this.onPositionChangeHandlers) e(this);
+        for (let e of this.onPositionChangeHandlers) e(this,e);
     }
     /**
      * the method updates the endpoint's top coordinate
@@ -668,11 +811,20 @@ class connlibEndpoint extends connlibAbstractRenderable {
             this.connection.calculatePath()
             this.connection.render();
         }
-        for (let e of this.onPositionChangeHandlers) e(this);
+        for (let e of this.onPositionChangeHandlers) e(this,e);
     }
 
     subscribePositionChange(handler) {
         this.onPositionChangeHandlers.push(handler);
+    }
+
+    unsubscribePositionChange(fun){
+        let i = this.onPositionChangeHandlers.indexOf(fun);
+        if(i > -1){
+            this.onPositionChangeHandlers.splice(i,1);
+        } else {
+            console.warn("cannot unsubscribe function");
+        }
     }
 }
 
@@ -683,6 +835,7 @@ class connlibBreakPoint extends connlibAbstractRenderable {
     c = null;
     r = null;
 
+    beforePositionChangeHandlers = [];
     onPositionChangeHandlers = [];
 
     constructor(object) {
@@ -696,21 +849,44 @@ class connlibBreakPoint extends connlibAbstractRenderable {
      * the method updates the endpoint's left coordinate
      */
     setLeft(left) {
+        var abort = {v:false};
+        for (let e of this.beforePositionChangeHandlers) e({top:this.r,left:left}, abort);
+        if(abort.v) return false;
         this.c = left;
-        for (let e of this.onPositionChangeHandlers) e(this);
+        for (let e of this.onPositionChangeHandlers) e(this,e);
+        return true;
     }
     /**
      * the method updates the endpoint's top coordinate
      */
     setTop(top) {
+        var abort = {v:false};
+        for (let e of this.beforePositionChangeHandlers) e({top:top,left:this.c}, abort);
+        if(abort.v) return false;
         this.r = top;
-        for (let e of this.onPositionChangeHandlers) e(this);
+        for (let e of this.onPositionChangeHandlers) e(this,e);
+        return true;
+    }
+     /**
+     * the method subscribes a before position change handler
+     */
+    subscribeBeforePositionChange(handler) {
+        this.beforePositionChangeHandlers.push(handler);
     }
     /**
      * the method subscribes a position change handler
      */
     subscribePositionChange(handler) {
         this.onPositionChangeHandlers.push(handler);
+    }
+    
+    unsubscribePositionChange(fun){
+        let i = this.onPositionChangeHandlers.indexOf(fun);
+        if(i > -1){
+            this.onPositionChangeHandlers.splice(i,1);
+        } else {
+            console.warn("cannot unsubscribe function");
+        }
     }
 }
 
@@ -951,6 +1127,11 @@ class connlibExt {
                 element2Endpoint.direction = connlibEdgeDirection.LEFT;
             }
         }
+
+        element1Endpoint.left = Math.ceil(element1Endpoint.left / connlib._gridScale) * connlib._gridScale;
+        element1Endpoint.top = Math.ceil(element1Endpoint.top / connlib._gridScale) * connlib._gridScale;
+        element2Endpoint.left = Math.ceil(element2Endpoint.left / connlib._gridScale) * connlib._gridScale;
+        element2Endpoint.top = Math.ceil(element2Endpoint.top / connlib._gridScale) * connlib._gridScale;
 
         return [new connlibEndpoint(element1, null, element1Endpoint), new connlibEndpoint(element2, null, element2Endpoint)];
     }
@@ -1235,7 +1416,9 @@ class connlibExt {
      * @param {*} target 
      * @param {*} direction 
      */
-    static IDAStar(source, target, direction) {
+    static IDAStar(e1, e2, direction) {
+        let source = e1.connGridE;
+        let target = e2.connGridE;
         var costs = {}
         var stack = {};
         var threshold = this.manhattenDistance(source, target);
@@ -1277,13 +1460,15 @@ class connlibExt {
                     let path = this.updateCostsAndGetAnchestors(costs, target);
                     let breakPoints = [];
                     for (let pI in path) {
-                        if (pI == 0) {
+                        if (path[pI].c == source.c && path[pI].r == source.r) {
+                            breakPoints.push(e1.reference());
+                        } else if (pI == 0) {
                             breakPoints.push(new connlibBreakPoint(path[pI]));
                         } else {
                             if (path[pI - 1].d != path[pI].d) breakPoints.push(new connlibBreakPoint(path[pI - 1]));
                         }
                     }
-                    breakPoints.push(new connlibBreakPoint(target));
+                    breakPoints.push(e2.reference());
                     return breakPoints;
                 }
                 if (c.d == threshold && c.o.d == direction) {
@@ -1321,51 +1506,6 @@ class connlibExt {
             s.seq = i;
             i++;
         }
-    }
-    /**
-     * OLD VERSION - NOT WORKING PROPERLY
-     * @param {*} source 
-     * @param {*} target 
-     * @param {*} d 
-     * @param {*} complete 
-     */
-    static idastar(source, target, d, complete) {
-        console.log("start searching path: ", source, target);
-        let grid = connlib._instance._internalGrid.cells;
-        let start = new Date().getTime();
-        let path = [];
-        var found = false;
-        var s = source;
-        let max = 4000;
-        var i = 0;
-        while (!found) {
-            if (i == max) {
-                console.log(path);
-                throw ("infinity loop recognized!");
-            }
-            if (s.r == target.r && s.c == target.c) {
-                path.push(s);
-                found = true;
-            } else {
-                let frontier = this.surroundingManhattenMinimumCells(s, target, grid);
-                if (frontier.length == 0) {
-                    console.log(path);
-                    throw ("no solution found!");
-                }
-
-                var r = frontier.find(x => x.d == d);
-                if (!r) r = frontier[0];
-
-                s = r.o;
-                grid[s.r][s.c].p = 1;
-                if (complete || i == 0 || d != s.d) path.push(s);
-                d = s.d;
-            }
-            i++;
-        }
-        console.log("time required: (ms) " + (new Date().getTime() - start));
-        for (let point of path) connlib.point(point, "red");
-        return path;
     }
     /**
      * the method returns the 

@@ -21,6 +21,7 @@
         margin: 0px;
         padding: 0px;
         overflow: hidden;
+        position: fixed;
     }
 
     #background-grid {
@@ -94,12 +95,18 @@
         position: absolute;
     }
 
-    .connlib-connection-hor {
+    .connlib-connection-hor, .connlib-estag-hor {
         cursor: row-resize;
     }
 
-    .connlib-connection-ver {
+    .connlib-connection-ver, .connlib-estag-ver {
         cursor: col-resize;
+    }
+
+    .endpoint-svg {
+        background-color: transparent;
+        z-index: 10;
+        position: absolute;
     }
 </style>
 <script>
