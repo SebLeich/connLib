@@ -149,6 +149,7 @@ class connlib {
                         case connlibLine.lineType.HORIZONTAL:
                             this.dragFlag.source.setTop(event.offsetY);
                             this.dragFlag.target.setTop(event.offsetY);
+                            console.log(this.dragFlag.target.guid);
                             break;
                         case connlibLine.lineType.VERTICAL:
                             this.dragFlag.source.setLeft(event.offsetX);
@@ -198,56 +199,41 @@ class connlib {
     /**
      * the method melts two points, drops one of them and connects all connections of the removed with the leaved
      */
-    static meltBreakPoints(p1, p2, direction) {
+    static meltBreakPoints(source, target, direction) {
         var f = false;
         let ls = [];
         let ps = [];
         while (!f) {
-            let l = p1.lines.find(x => !ls.includes(x) && x.type == direction);
+            let l = source.lines.find(x => !ls.includes(x) && x.type == direction && x.target == source);
             if (!l) f = true;
             else {
                 ls.push(l);
-                ps.push(p1);
-                if (l.source == p1){
-                    p1 = l.target;
-                } else {
-                    p1 = l.source;
-                }
+                ps.push(source);
+                source = l.source;
             }
         }
         f = false;
         while (!f) {
-            let l = p2.lines.find(x => !ls.includes(x) && x.type == direction);
+            let l = target.lines.find(x => !ls.includes(x) && x.type == direction && x.source == target);
             if (!l) f = true;
             else {
                 ls.push(l);
-                ps.push(p2);
-                if (l.source == p2){
-                    p2 = l.target;
-                } else {
-                    p2 = l.source;
-                }
+                ps.push(target);
+                target = l.target;
             }
         }
-        if(ls.includes(connlib.dragFlag)){
+        if (ls.includes(connlib.dragFlag)) {
             let n = connlib.dragFlag;
-            for(let l of ls){
-                if(l != n) l.remove();
+            for (let l of ls) {
+                if (l != n) l.remove();
             }
-            for(let p of ps){
+            for (let p of ps) {
                 p.remove();
             }
-            n.replaceBreakPoints(p1, p2);
+            n.replaceBreakPoints(source, target);
             return true;
         }
         return false;
-        /*
-        let n = connlibLine.connect(p1, p2);
-        n.connection = p1.connection;
-        n.connection.lines.push(n);
-        n.render();
-        */
-        //return n;
     }
 
     static point(point, color) {
@@ -537,7 +523,7 @@ class connlibLine extends connlibAbstractRenderable {
         if (cI > -1) this.connection.lines.splice(cI, 1);
         let lI = connlib.instance._lines.indexOf(this);
         if (lI > -1) connlib.instance._lines.splice(lI, 1);
-        if(connlib.dragFlag == this) connlib.dragFlag = null;
+        if (connlib.dragFlag == this) connlib.dragFlag = null;
         this.clear();
     }
     /**
@@ -595,7 +581,7 @@ class connlibLine extends connlibAbstractRenderable {
     /**
      * the method analysis the current line's type
      */
-    updateType(){
+    updateType() {
         if (this.source.r == this.target.r) {
             this.hsvg.classList.add("connlib-connection-hor");
             this.hsvg.classList.remove("connlib-connection-ver");
@@ -624,7 +610,7 @@ class connlibLine extends connlibAbstractRenderable {
                     abort = connlib.meltBreakPoints(this.source, this.target, connlibLine.lineType.HORIZONTAL);
                     break;
             }
-            if(abort) return;
+            if (abort) return;
         }
         this.lsvg.setAttribute("d", "M" + this.source.c + " " + this.source.r + " L" + this.target.c + " " + this.target.r);
         this.hsvg.setAttribute("d", "M" + this.source.c + " " + this.source.r + " L" + this.target.c + " " + this.target.r);
@@ -643,9 +629,13 @@ class connlibEndpoint extends connlibAbstractRenderable {
     _connGridE = null;
     _rendered = false;
     svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-
+    /**
+     * the position change event handlers
+     */
     onPositionChangeHandlers = [];
-
+    /**
+     * the constructor creates a new endpoint
+     */
     constructor(source, connection, positioning) {
         super();
         connlibExt.overprintGuid(this, "guid");
@@ -702,15 +692,13 @@ class connlibEndpoint extends connlibAbstractRenderable {
         var corrT = point.r + parseFloat(bg.style.top);
         switch (this.direction) {
             case connlibEdgeDirection.TOP:
-                corrT -= connlib._endpointStag;
-                break;
-            case connlibEdgeDirection.RIGHT:
-                corrL += connlib._endpointStag;
+                corrT = point.r;
                 break;
             case connlibEdgeDirection.BOTTOM:
-                corrT += connlib._endpointStag;
+                corrT -= connlib._endpointStag;
                 break;
             case connlibEdgeDirection.LEFT:
+            case connlibEdgeDirection.RIGHT:
                 corrL -= connlib._endpointStag;
                 break;
         }
@@ -750,7 +738,9 @@ class connlibEndpoint extends connlibAbstractRenderable {
         }
         */
     }
-
+    /**
+     * the method returns the endpoint's grid point
+     */
     get gridE() {
         let bg = document.getElementById("background-grid");
         var corrL = Math.ceil((this.left - parseFloat(bg.style.left)) / connlib.instance._gridScale) * connlib.instance._gridScale;
@@ -768,6 +758,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
      */
     reference() {
         let p = new connlibBreakPoint(this._connGridE);
+        p._isEP = true;
         p.subscribeBeforePositionChange((newPos, abort) => {
             switch (this.direction) {
                 case connlibEdgeDirection.TOP:
@@ -788,10 +779,11 @@ class connlibEndpoint extends connlibAbstractRenderable {
             let r = this.calculateElementPointFromCGridE(point);
             switch (this.direction) {
                 case connlibEdgeDirection.TOP:
+                    console.log(r.top, this._connGridE.r);
                     this.left = r.left;
-                    if(this.left < this.source.offsetLeft){
+                    if (this.left < this.source.offsetLeft) {
                         console.log("TO LEFT");
-                    } else if(this.left > (this.source.offsetLeft + this.source.offsetWidth)){
+                    } else if (this.left > (this.source.offsetLeft + this.source.offsetWidth)) {
                         console.log("TO RIGHT");
                     }
                     if (r.top < this._connGridE.r) {
@@ -806,9 +798,9 @@ class connlibEndpoint extends connlibAbstractRenderable {
                     break;
                 case connlibEdgeDirection.RIGHT:
                     this.top = r.top;
-                    if(this.top < this.source.offsetTop){
+                    if (this.top < this.source.offsetTop) {
                         console.log("TO TOP");
-                    } else if(this.top > (this.source.offsetTop + this.source.offsetHeight)){
+                    } else if (this.top > (this.source.offsetTop + this.source.offsetHeight)) {
                         console.log("TO BOTTOM");
                     }
                     if (r.left > this._connGridE.c) {
@@ -823,9 +815,9 @@ class connlibEndpoint extends connlibAbstractRenderable {
                     break;
                 case connlibEdgeDirection.BOTTOM:
                     this.left = r.left;
-                    if(this.left < this.source.offsetLeft){
+                    if (this.left < this.source.offsetLeft) {
                         console.log("TO LEFT");
-                    } else if(this.left > (this.source.offsetLeft + this.source.offsetWidth)){
+                    } else if (this.left > (this.source.offsetLeft + this.source.offsetWidth)) {
                         console.log("TO RIGHT");
                     }
                     if (r.top > this._connGridE.r) {
@@ -840,9 +832,9 @@ class connlibEndpoint extends connlibAbstractRenderable {
                     break;
                 case connlibEdgeDirection.LEFT:
                     this.top = r.top;
-                    if(this.top < this.source.offsetTop){
+                    if (this.top < this.source.offsetTop) {
                         console.log("TO TOP");
-                    } else if(this.top > (this.source.offsetTop + this.source.offsetHeight)){
+                    } else if (this.top > (this.source.offsetTop + this.source.offsetHeight)) {
                         console.log("TO BOTTOM");
                     }
                     if (r.left < this._connGridE.c) {
@@ -874,7 +866,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
         var f2 = null; // footer point 2
         switch (this.direction) {
             case connlibEdgeDirection.TOP:
-                this.svg.style.left = this.left - (connlib._endpointSizeThk / 2);
+                this.svg.style.left = this.left - (connlib._endpointSizeThk / 2) + 1;
                 this.svg.style.top = this.top - connlib._endpointStag;
                 this.svg.style.height = connlib._endpointSizeThn + connlib._endpointStag;
                 this.svg.style.width = connlib._endpointSizeThk;
@@ -918,6 +910,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 f2 = { x: (connlib._endpointStag - connlib._endpointSizeThn), y: (connlib._endpointSizeThk - 5) };
                 break;
         }
+        this.svg.appendChild(this.p);
         switch (this.type) {
             case connlibEndpointType.ARROW:
                 if (c && f1 && f2) {
@@ -928,9 +921,18 @@ class connlibEndpoint extends connlibAbstractRenderable {
                     this.svg.appendChild(this.a);
                 }
                 break;
+            case connlibEndpointType.INHERITANCE:
+                if (c && f1 && f2) {
+                    this.a = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                    this.a.style.fill = "#ffffff";
+                    this.a.style.stroke = "#373737";
+                    this.a.style.strokeWidth = 1;
+                    this.a.setAttribute("points", c.x + "," + c.y + " " + f1.x + "," + f1.y + " " + f2.x + "," + f2.y);
+                    this.svg.appendChild(this.a);
+                }
+                break;
         }
         document.getElementById("body").appendChild(this.svg);
-        this.svg.appendChild(this.p);
         this._rendered = true;
     }
     /**
@@ -957,11 +959,15 @@ class connlibEndpoint extends connlibAbstractRenderable {
         }
         for (let e of this.onPositionChangeHandlers) e(this, e, connlibLine.lineType.VERTICAL);
     }
-
+    /**
+     * the method registers a handler that is fired on position changed 
+     */
     subscribePositionChange(handler) {
         this.onPositionChangeHandlers.push(handler);
     }
-
+    /**
+     * the method unregisters a handler on position changed
+     */
     unsubscribePositionChange(fun) {
         let i = this.onPositionChangeHandlers.indexOf(fun);
         if (i > -1) {
@@ -981,6 +987,8 @@ class connlibBreakPoint extends connlibAbstractRenderable {
 
     beforePositionChangeHandlers = [];
     onPositionChangeHandlers = [];
+
+    _isEP = false;
 
     constructor(object) {
         super();
@@ -1010,7 +1018,10 @@ class connlibBreakPoint extends connlibAbstractRenderable {
     setLeft(left) {
         var abort = { v: false };
         for (let e of this.beforePositionChangeHandlers) e({ top: this.r, left: left }, abort);
-        if (abort.v) return false;
+        if (abort.v) {
+            console.log("aborted");
+            return false;
+        }
         this.c = left;
         for (let e of this.onPositionChangeHandlers) e(this, e, connlibLine.lineType.HORIZONTAL);
         return true;
@@ -1021,7 +1032,10 @@ class connlibBreakPoint extends connlibAbstractRenderable {
     setTop(top) {
         var abort = { v: false };
         for (let e of this.beforePositionChangeHandlers) e({ top: top, left: this.c }, abort);
-        if (abort.v) return false;
+        if (abort.v) {
+            console.log("aborted");
+            return false;
+        }
         this.r = top;
         for (let e of this.onPositionChangeHandlers) e(this, e, connlibLine.lineType.VERTICAL);
         return true;
@@ -1090,7 +1104,8 @@ class connlibGrid {
 
 const connlibEndpointType = {
     "DEFAULT": 0,
-    "ARROW": 1
+    "ARROW": 1,
+    "INHERITANCE": 2
 }
 
 

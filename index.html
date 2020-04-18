@@ -116,7 +116,8 @@
             connlib.connect("el1", "el2");
             connlib.connect("el2", "el3");
             connlib.connect("el3", "el1");
-            connlib.connect("el1", "el4");
+            connlib.connect("el4", "el1");
+            connlib.connect("el4", "el3");
             connlib.instance.render();
             let end_time = new Date();
             console.log("EXECUTION FINISHED, MS: " + (end_time.getTime() - start_time.getTime()));
