@@ -199,7 +199,6 @@ class connlib {
      * the method melts two points, drops one of them and connects all connections of the removed with the leaved
      */
     static meltBreakPoints(p1, p2, direction) {
-        console.log(p1, p2);
         var f = false;
         let ls = [];
         let ps = [];
@@ -790,6 +789,11 @@ class connlibEndpoint extends connlibAbstractRenderable {
             switch (this.direction) {
                 case connlibEdgeDirection.TOP:
                     this.left = r.left;
+                    if(this.left < this.source.offsetLeft){
+                        console.log("TO LEFT");
+                    } else if(this.left > (this.source.offsetLeft + this.source.offsetWidth)){
+                        console.log("TO RIGHT");
+                    }
                     if (r.top < this._connGridE.r) {
                         point.unsubscribePositionChange(self);
                         let ref = this.reference();
@@ -802,6 +806,11 @@ class connlibEndpoint extends connlibAbstractRenderable {
                     break;
                 case connlibEdgeDirection.RIGHT:
                     this.top = r.top;
+                    if(this.top < this.source.offsetTop){
+                        console.log("TO TOP");
+                    } else if(this.top > (this.source.offsetTop + this.source.offsetHeight)){
+                        console.log("TO BOTTOM");
+                    }
                     if (r.left > this._connGridE.c) {
                         point.unsubscribePositionChange(self);
                         let ref = this.reference();
@@ -814,6 +823,11 @@ class connlibEndpoint extends connlibAbstractRenderable {
                     break;
                 case connlibEdgeDirection.BOTTOM:
                     this.left = r.left;
+                    if(this.left < this.source.offsetLeft){
+                        console.log("TO LEFT");
+                    } else if(this.left > (this.source.offsetLeft + this.source.offsetWidth)){
+                        console.log("TO RIGHT");
+                    }
                     if (r.top > this._connGridE.r) {
                         point.unsubscribePositionChange(self);
                         let ref = this.reference();
@@ -826,6 +840,11 @@ class connlibEndpoint extends connlibAbstractRenderable {
                     break;
                 case connlibEdgeDirection.LEFT:
                     this.top = r.top;
+                    if(this.top < this.source.offsetTop){
+                        console.log("TO TOP");
+                    } else if(this.top > (this.source.offsetTop + this.source.offsetHeight)){
+                        console.log("TO BOTTOM");
+                    }
                     if (r.left < this._connGridE.c) {
                         point.unsubscribePositionChange(self);
                         let ref = this.reference();
