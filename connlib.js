@@ -199,15 +199,21 @@ class connlib {
      * the method melts two points, drops one of them and connects all connections of the removed with the leaved
      */
     static meltBreakPoints(p1, p2, direction) {
+        console.log(p1, p2);
         var f = false;
         let ls = [];
+        let ps = [];
         while (!f) {
             let l = p1.lines.find(x => !ls.includes(x) && x.type == direction);
             if (!l) f = true;
             else {
                 ls.push(l);
-                if (l.source == p1) p1 = l.target;
-                p1 = l.source;
+                ps.push(p1);
+                if (l.source == p1){
+                    p1 = l.target;
+                } else {
+                    p1 = l.source;
+                }
             }
         }
         f = false;
@@ -216,17 +222,25 @@ class connlib {
             if (!l) f = true;
             else {
                 ls.push(l);
-                if (l.source == p2) p2 = l.target;
-                p2 = l.source;
+                ps.push(p2);
+                if (l.source == p2){
+                    p2 = l.target;
+                } else {
+                    p2 = l.source;
+                }
             }
         }
         if(ls.includes(connlib.dragFlag)){
             let n = connlib.dragFlag;
-            console.log(n);
+            for(let l of ls){
+                if(l != n) l.remove();
+            }
+            for(let p of ps){
+                p.remove();
+            }
             n.replaceBreakPoints(p1, p2);
             return true;
         }
-        console.log(ls);
         return false;
         /*
         let n = connlibLine.connect(p1, p2);
@@ -242,7 +256,7 @@ class connlib {
         let p = document.createElementNS("http://www.w3.org/2000/svg", "circle");
         p.setAttribute("cx", point.c);
         p.setAttribute("cy", point.r);
-        p.setAttribute("r", 1);
+        p.setAttribute("r", 5);
         p.setAttribute("fill", color);
         bg.appendChild(p);
     }
@@ -601,13 +615,13 @@ class connlibLine extends connlibAbstractRenderable {
      */
     updatePosition(direction) {
         if (this.length == 0 && direction) {
-            this.remove();
             var abort = true;
+            this.remove();
             switch (direction) {
                 case connlibLine.lineType.HORIZONTAL:
                     abort = connlib.meltBreakPoints(this.source, this.target, connlibLine.lineType.VERTICAL);
                     break;
-                case connlibLine.lineType.HORIZONTAL:
+                case connlibLine.lineType.VERTICAL:
                     abort = connlib.meltBreakPoints(this.source, this.target, connlibLine.lineType.HORIZONTAL);
                     break;
             }
@@ -841,8 +855,8 @@ class connlibEndpoint extends connlibAbstractRenderable {
         var f2 = null; // footer point 2
         switch (this.direction) {
             case connlibEdgeDirection.TOP:
-                this.svg.style.left = this.left - (connlib._endpointSizeThk / 2) + 1;
-                this.svg.style.top = this.top - connlib._endpointStag - 1;
+                this.svg.style.left = this.left - (connlib._endpointSizeThk / 2);
+                this.svg.style.top = this.top - connlib._endpointStag;
                 this.svg.style.height = connlib._endpointSizeThn + connlib._endpointStag;
                 this.svg.style.width = connlib._endpointSizeThk;
                 this.svg.classList.add("connlib-estag-ver");
