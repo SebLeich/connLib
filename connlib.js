@@ -32,8 +32,9 @@ class connlib {
     _moveStep = 20;
     _invertMoveDirection = false;
     _gridPadding = 80;
+    _elementMargin = 10; // reserved margin around blocking elements
 
-    _renderCellsWalkable = false;
+    _renderCellsWalkable = true;
     _renderCellsNotWalkable = true;
     _gridCellsRendered = false;
 
@@ -246,6 +247,18 @@ class connlib {
         bg.appendChild(p);
     }
 
+    static rect(point, size, color) {
+        let bg = this.instance.container;
+        let p = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        p.setAttribute("x", point.c);
+        p.setAttribute("y", point.r);
+        p.setAttribute("width", (size - 1));
+        p.setAttribute("height", (size - 1));
+        p.setAttribute("fill", color);
+        p.classList.add("drawed-rect");
+        bg.appendChild(p);
+    }
+
     render() {
         this.clear();
         this.updateGrid();
@@ -264,9 +277,9 @@ class connlib {
             for (let rI in this._internalGrid.cells) {
                 for (let cI in this._internalGrid.cells[rI]) {
                     if (this._renderCellsWalkable && this._internalGrid.cells[rI][cI].w == 1) {
-                        connlib.point(this._internalGrid.cells[rI][cI], "green");
+                        connlib.rect(this._internalGrid.cells[rI][cI], connlib._gridScale, "green");
                     } else if (this._renderCellsNotWalkable && this._internalGrid.cells[rI][cI].w == 0) {
-                        connlib.point(this._internalGrid.cells[rI][cI], "orange");
+                        connlib.rect(this._internalGrid.cells[rI][cI], connlib._gridScale, "orange");
                     }
                 }
             }
@@ -293,11 +306,11 @@ class connlib {
         this._internalGrid = new connlibGrid(width, height, this._gridScale);
         let blocks = document.getElementsByClassName("connlib-block");
         for (let element of blocks) {
-            let rect = element.getBoundingClientRect();
-            let left = Math.ceil((rect.left - parseFloat(bg.style.left)) / this._gridScale) * this._gridScale;
-            let right = Math.ceil((rect.right - parseFloat(bg.style.left)) / this._gridScale) * this._gridScale;
-            let top = Math.ceil((rect.top - parseFloat(bg.style.top)) / this._gridScale) * this._gridScale;
-            let bottom = Math.ceil((rect.bottom - parseFloat(bg.style.top)) / this._gridScale) * this._gridScale;
+            let rect = connlibExt.offsetRect(element);
+            let left = Math.round((rect.left - parseFloat(bg.style.left)) / this._gridScale) * this._gridScale;
+            let right = Math.round((rect.right - parseFloat(bg.style.left)) / this._gridScale) * this._gridScale;
+            let top = Math.round((rect.top - parseFloat(bg.style.top)) / this._gridScale) * this._gridScale;
+            let bottom = Math.round((rect.bottom - parseFloat(bg.style.top)) / this._gridScale) * this._gridScale;
             for (var r = top; r <= bottom; r += this._gridScale) {
                 for (var c = left; c <= right; c += this._gridScale) {
                     this._internalGrid.cells[r][c].w = 0;
@@ -386,29 +399,51 @@ class connlibConnection extends connlibAbstractRenderable {
         this.pathPoints = [];
         if (this.isRendered()) this.clear();
         var direction;
+        var dir;
         switch (this.endpoints[0].direction) {
             case connlibEdgeDirection.TOP:
                 direction = connlibDir.T;
+                dir = connlibLine.lineType.VERTICAL;
                 break;
             case connlibEdgeDirection.RIGHT:
                 direction = connlibDir.R;
+                dir = connlibLine.lineType.HORIZONTAL;
                 break;
             case connlibEdgeDirection.BOTTOM:
                 direction = connlibDir.B;
+                dir = connlibLine.lineType.VERTICAL;
                 break;
             case connlibEdgeDirection.LEFT:
                 direction = connlibDir.L;
+                dir = connlibLine.lineType.HORIZONTAL;
                 break;
         }
         this.pathPoints = connlibExt.IDAStar(this.endpoints[0], this.endpoints[1], direction);
         for (var i = 1; i < this.pathPoints.length; i++) {
             let s = this.pathPoints[i - 1];
             let t = this.pathPoints[i];
-            s.connection = this;
-            t.connection = this;
-            let l = connlibLine.connect(s, t);
-            l.connection = this;
-            this.lines.push(l);
+            let ps = [s,t];
+            if(s.c == t.c){
+                dir = connlibLine.lineType.VERTICAL;
+            } else if(s.r == t.r){
+                dir = connlibLine.lineType.HORIZONTAL;
+            } else {
+                var diff;
+                if(dir == connlibLine.lineType.HORIZONTAL){
+                    diff = (t.c - s.c)/2 + s.c;
+                    ps = [s,new connlibBreakPoint({c:diff,r:s.r}),new connlibBreakPoint({c:diff,r:t.r}),t];
+                } else if(dir == connlibLine.lineType.VERTICAL){
+                    diff = (t.r - s.r)/2 + s.r;
+                    ps = [s,new connlibBreakPoint({c:s.c,r:diff}),new connlibBreakPoint({c:t.c,r:diff}),t];
+                } else throw("error");
+            }
+            for(var pI = 1; pI < ps.length; pI++){
+                ps[pI-1].connection = this;
+                ps[pI].connection = this;
+                let l = connlibLine.connect(ps[pI-1],ps[pI]);
+                l.connection = this;
+                this.lines.push(l);
+            }
         }
     }
     /**
@@ -622,10 +657,11 @@ class connlibEndpoint extends connlibAbstractRenderable {
     connection = null;
     left = null;
     top = null;
-    type = connlibEndpointType.ARROW;
+    type = connlibEndpointType.INHERITANCE;
     direction = null;
-    a = null; // rendered anchor point
-    p = null; // rendered, stagged anchor path
+    a = null;  // rendered anchor point
+    p = null;  // rendered, stagged anchor path
+    b = null; // rendered, port
     _connGridE = null;
     _rendered = false;
     svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -779,7 +815,6 @@ class connlibEndpoint extends connlibAbstractRenderable {
             let r = this.calculateElementPointFromCGridE(point);
             switch (this.direction) {
                 case connlibEdgeDirection.TOP:
-                    console.log(r.top, this._connGridE.r);
                     this.left = r.left;
                     if (this.left < this.source.offsetLeft) {
                         console.log("TO LEFT");
@@ -864,6 +899,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
         var c = null; // pointer center
         var f1 = null; // footer point 1
         var f2 = null; // footer point 2
+        var pb = null; // port base point
         switch (this.direction) {
             case connlibEdgeDirection.TOP:
                 this.svg.style.left = this.left - (connlib._endpointSizeThk / 2) + 1;
@@ -875,6 +911,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 c = { x: thkH, y: (connlib._endpointStag) };
                 f1 = { x: 5, y: (connlib._endpointStag - connlib._endpointSizeThn) };
                 f2 = { x: (connlib._endpointSizeThk - 5), y: (connlib._endpointStag - connlib._endpointSizeThn) };
+                pb = { x: f1.x, y: f1.y };
                 break;
             case connlibEdgeDirection.RIGHT:
                 this.svg.style.left = this.left - connlib._endpointSizeThn + 1;
@@ -886,6 +923,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 c = { x: connlib._endpointSizeThn, y: thkH };
                 f1 = { x: (connlib._endpointSizeThn * 2), y: 5 };
                 f2 = { x: (connlib._endpointSizeThn * 2), y: (connlib._endpointSizeThk - 5) };
+                pb = { x: f1.x, y: f1.y };
                 break;
             case connlibEdgeDirection.BOTTOM:
                 this.svg.style.left = this.left - (connlib._endpointSizeThk / 2) + 1;
@@ -919,6 +957,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
                     this.a.style.strokeWidth = 1;
                     this.a.setAttribute("points", c.x + "," + c.y + " " + f1.x + "," + f1.y + " " + f2.x + "," + f2.y);
                     this.svg.appendChild(this.a);
+                    this.b = null;
                 }
                 break;
             case connlibEndpointType.INHERITANCE:
@@ -929,6 +968,18 @@ class connlibEndpoint extends connlibAbstractRenderable {
                     this.a.style.strokeWidth = 1;
                     this.a.setAttribute("points", c.x + "," + c.y + " " + f1.x + "," + f1.y + " " + f2.x + "," + f2.y);
                     this.svg.appendChild(this.a);
+                    this.b = null;
+                }
+                break;
+            case connlibEndpointType.PORT:
+                if (c && f1 && f2) {
+                    this.a = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                    this.a.style.fill = "#373737";
+                    this.a.style.stroke = "#373737";
+                    this.a.style.strokeWidth = 1;
+                    this.a.setAttribute("points", c.x + "," + c.y + " " + f1.x + "," + f1.y + " " + f2.x + "," + f2.y);
+                    this.svg.appendChild(this.a);
+                    this.b = null;
                 }
                 break;
         }
@@ -958,6 +1009,15 @@ class connlibEndpoint extends connlibAbstractRenderable {
             this.connection.render();
         }
         for (let e of this.onPositionChangeHandlers) e(this, e, connlibLine.lineType.VERTICAL);
+    }
+    /**
+     * the method sets the endpoint type
+     */
+    setType(type){
+        this.type = type;
+        if(this.isRendered()){
+            this.render();
+        }
     }
     /**
      * the method registers a handler that is fired on position changed 
@@ -1105,7 +1165,8 @@ class connlibGrid {
 const connlibEndpointType = {
     "DEFAULT": 0,
     "ARROW": 1,
-    "INHERITANCE": 2
+    "INHERITANCE": 2,
+    "PORT": 3
 }
 
 
@@ -1125,17 +1186,19 @@ class connlibExt {
         let mEl1 = this.calcMiddle(element1);
         let mEl2 = this.calcMiddle(element2);
 
+        console.log(mEl1, mEl2);
+
         var element1Endpoint = null;
         var element2Endpoint = null;
 
         let fun = this.calcFunForTwoPoints(mEl1, mEl2);
 
         var p1 = {
-            "top": mEl1.rect.y,
-            "left": mEl1.rect.x
+            "top": mEl1.rect.top,
+            "left": mEl1.rect.left
         };
         var p2 = {
-            "top": mEl1.rect.y,
+            "top": mEl1.rect.top,
             "left": mEl1.rect.right
         };
         if (p1.left == p2.left) {
@@ -1153,7 +1216,7 @@ class connlibExt {
             }
         }
         p1 = {
-            "top": mEl1.rect.y,
+            "top": mEl1.rect.top,
             "left": mEl1.rect.right
         };
         p2 = {
@@ -1180,7 +1243,7 @@ class connlibExt {
         };
         p2 = {
             "top": mEl1.rect.bottom,
-            "left": mEl1.rect.x
+            "left": mEl1.rect.left
         };
         if (p1.left == p2.left) {
             let inter = this.getYForX(fun, p1.left);
@@ -1198,11 +1261,11 @@ class connlibExt {
         }
         p1 = {
             "top": mEl1.rect.bottom,
-            "left": mEl1.rect.x
+            "left": mEl1.rect.left
         };
         p2 = {
-            "top": mEl1.rect.y,
-            "left": mEl1.rect.x
+            "top": mEl1.rect.top,
+            "left": mEl1.rect.left
         };
         if (p1.left == p2.left) {
             let inter = this.getYForX(fun, p1.left);
@@ -1220,11 +1283,11 @@ class connlibExt {
         }
 
         p1 = {
-            "top": mEl2.rect.y,
-            "left": mEl2.rect.x
+            "top": mEl2.rect.top,
+            "left": mEl2.rect.left
         };
         p2 = {
-            "top": mEl2.rect.y,
+            "top": mEl2.rect.top,
             "left": mEl2.rect.right
         };
         if (p1.left == p2.left) {
@@ -1242,7 +1305,7 @@ class connlibExt {
             }
         }
         p1 = {
-            "top": mEl2.rect.y,
+            "top": mEl2.rect.top,
             "left": mEl2.rect.right
         };
         p2 = {
@@ -1269,7 +1332,7 @@ class connlibExt {
         };
         p2 = {
             "top": mEl2.rect.bottom,
-            "left": mEl2.rect.x
+            "left": mEl2.rect.left
         };
         if (p1.left == p2.left) {
             let inter = this.getYForX(fun, p1.left);
@@ -1287,11 +1350,11 @@ class connlibExt {
         }
         p1 = {
             "top": mEl2.rect.bottom,
-            "left": mEl2.rect.x
+            "left": mEl2.rect.left
         };
         p2 = {
-            "top": mEl2.rect.y,
-            "left": mEl2.rect.x
+            "top": mEl2.rect.top,
+            "left": mEl2.rect.left
         };
         if (p1.left == p2.left) {
             let inter = this.getYForX(fun, p1.left);
@@ -1308,10 +1371,10 @@ class connlibExt {
             }
         }
 
-        element1Endpoint.left = Math.ceil(element1Endpoint.left / connlib._gridScale) * connlib._gridScale;
-        element1Endpoint.top = Math.ceil(element1Endpoint.top / connlib._gridScale) * connlib._gridScale;
-        element2Endpoint.left = Math.ceil(element2Endpoint.left / connlib._gridScale) * connlib._gridScale;
-        element2Endpoint.top = Math.ceil(element2Endpoint.top / connlib._gridScale) * connlib._gridScale;
+        element1Endpoint.left = Math.round(element1Endpoint.left / connlib._gridScale) * connlib._gridScale;
+        element1Endpoint.top = Math.round(element1Endpoint.top / connlib._gridScale) * connlib._gridScale;
+        element2Endpoint.left = Math.round(element2Endpoint.left / connlib._gridScale) * connlib._gridScale;
+        element2Endpoint.top = Math.round(element2Endpoint.top / connlib._gridScale) * connlib._gridScale;
 
         return [new connlibEndpoint(element1, null, element1Endpoint), new connlibEndpoint(element2, null, element2Endpoint)];
     }
@@ -1364,11 +1427,8 @@ class connlibExt {
     }
 
     static calcMiddle(element) {
-        let cR = element.getBoundingClientRect();
-        let output = { "left": null, "top": null, "rect": cR };
-        output.left = cR.x + (cR.width / 2);
-        output.top = cR.y + (cR.height / 2);
-        return output;
+        let d = this.offsetRect(element);
+        return { "left": d.left + (d.width/2), "top": d.top + (d.height/2), "rect": d };
     }
 
     static eukDist(p1, p2) {
@@ -1753,6 +1813,20 @@ class connlibExt {
             this.guidMap[guid] = instance;
             return instance;
         }
+    }
+    /**
+     * the method returns the element's offset rectangle
+     * @param {*} element 
+     */
+    static offsetRect(element){
+        return {
+            top: element.offsetTop,
+            left: element.offsetLeft,
+            height: element.offsetHeight,
+            width: element.offsetWidth,
+            right: element.offsetLeft + element.offsetWidth,
+            bottom: element.offsetTop + element.offsetHeight
+        };
     }
     /**
      * the method calculates the costs for the anchestors
