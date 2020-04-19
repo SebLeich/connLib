@@ -422,25 +422,25 @@ class connlibConnection extends connlibAbstractRenderable {
         for (var i = 1; i < this.pathPoints.length; i++) {
             let s = this.pathPoints[i - 1];
             let t = this.pathPoints[i];
-            let ps = [s,t];
-            if(s.c == t.c){
+            let ps = [s, t];
+            if (s.c == t.c) {
                 dir = connlibLine.lineType.VERTICAL;
-            } else if(s.r == t.r){
+            } else if (s.r == t.r) {
                 dir = connlibLine.lineType.HORIZONTAL;
             } else {
                 var diff;
-                if(dir == connlibLine.lineType.HORIZONTAL){
-                    diff = (t.c - s.c)/2 + s.c;
-                    ps = [s,new connlibBreakPoint({c:diff,r:s.r}),new connlibBreakPoint({c:diff,r:t.r}),t];
-                } else if(dir == connlibLine.lineType.VERTICAL){
-                    diff = (t.r - s.r)/2 + s.r;
-                    ps = [s,new connlibBreakPoint({c:s.c,r:diff}),new connlibBreakPoint({c:t.c,r:diff}),t];
-                } else throw("error");
+                if (dir == connlibLine.lineType.HORIZONTAL) {
+                    diff = (t.c - s.c) / 2 + s.c;
+                    ps = [s, new connlibBreakPoint({ c: diff, r: s.r }), new connlibBreakPoint({ c: diff, r: t.r }), t];
+                } else if (dir == connlibLine.lineType.VERTICAL) {
+                    diff = (t.r - s.r) / 2 + s.r;
+                    ps = [s, new connlibBreakPoint({ c: s.c, r: diff }), new connlibBreakPoint({ c: t.c, r: diff }), t];
+                } else throw ("error");
             }
-            for(var pI = 1; pI < ps.length; pI++){
-                ps[pI-1].connection = this;
+            for (var pI = 1; pI < ps.length; pI++) {
+                ps[pI - 1].connection = this;
                 ps[pI].connection = this;
-                let l = connlibLine.connect(ps[pI-1],ps[pI]);
+                let l = connlibLine.connect(ps[pI - 1], ps[pI]);
                 l.connection = this;
                 this.lines.push(l);
             }
@@ -657,7 +657,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
     connection = null;
     left = null;
     top = null;
-    type = connlibEndpointType.INHERITANCE;
+    type = connlibEndpointType.PORT_FULFILLMENT;
     direction = null;
     a = null;  // rendered anchor point
     p = null;  // rendered, stagged anchor path
@@ -911,7 +911,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 c = { x: thkH, y: (connlib._endpointStag) };
                 f1 = { x: 5, y: (connlib._endpointStag - connlib._endpointSizeThn) };
                 f2 = { x: (connlib._endpointSizeThk - 5), y: (connlib._endpointStag - connlib._endpointSizeThn) };
-                pb = { x: f1.x, y: f1.y };
+                pb = { x: f1.x, y: (c.y - (connlib._endpointSizeThn / 2)) };
                 break;
             case connlibEdgeDirection.RIGHT:
                 this.svg.style.left = this.left - connlib._endpointSizeThn + 1;
@@ -923,7 +923,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 c = { x: connlib._endpointSizeThn, y: thkH };
                 f1 = { x: (connlib._endpointSizeThn * 2), y: 5 };
                 f2 = { x: (connlib._endpointSizeThn * 2), y: (connlib._endpointSizeThk - 5) };
-                pb = { x: f1.x, y: f1.y };
+                pb = { x: (c.x - (connlib._endpointSizeThn / 2)), y: f1.y };
                 break;
             case connlibEdgeDirection.BOTTOM:
                 this.svg.style.left = this.left - (connlib._endpointSizeThk / 2) + 1;
@@ -935,9 +935,10 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 c = { x: thkH, y: connlib._endpointSizeThn };
                 f1 = { x: 5, y: (connlib._endpointSizeThn * 2) };
                 f2 = { x: (connlib._endpointSizeThk - 5), y: (connlib._endpointSizeThn * 2) };
+                pb = { x: f1.x, y: (c.y - (connlib._endpointSizeThn / 2)) };
                 break;
             case connlibEdgeDirection.LEFT:
-                this.svg.style.left = this.left - connlib._endpointStag + 1;
+                this.svg.style.left = this.left - connlib._endpointStag;
                 this.svg.style.top = this.top - (connlib._endpointSizeThk / 2) + 1;
                 this.svg.style.height = connlib._endpointSizeThk;
                 this.svg.style.width = connlib._endpointSizeThn + connlib._endpointStag;
@@ -946,6 +947,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 c = { x: connlib._endpointStag, y: thkH };
                 f1 = { x: (connlib._endpointStag - connlib._endpointSizeThn), y: 5 };
                 f2 = { x: (connlib._endpointStag - connlib._endpointSizeThn), y: (connlib._endpointSizeThk - 5) };
+                pb = { x: (c.x - (connlib._endpointSizeThn / 2)), y: f1.y };
                 break;
         }
         this.svg.appendChild(this.p);
@@ -973,13 +975,34 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 break;
             case connlibEndpointType.PORT:
                 if (c && f1 && f2) {
+                    this.b = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    this.b.style.fill = "#ffffff";
+                    this.b.style.stroke = "#373737";
+                    this.b.style.strokeWidth = 1;
+                    this.b.setAttribute("x", pb.x);
+                    this.b.setAttribute("y", pb.y);
+                    this.b.setAttribute("height", connlib._endpointSizeThn);
+                    this.b.setAttribute("width", connlib._endpointSizeThn);
+                    this.a = null;
+                    this.svg.appendChild(this.b);
+                }
+                break;
+            case connlibEndpointType.PORT_FULFILLMENT:
+                if (c && f1 && f2) {
+                    this.b = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    this.b.style.fill = "#ffffff";
+                    this.b.style.stroke = "#373737";
+                    this.b.style.strokeWidth = 1;
+                    this.b.setAttribute("x", pb.x);
+                    this.b.setAttribute("y", pb.y);
+                    this.b.setAttribute("height", connlib._endpointSizeThn);
+                    this.b.setAttribute("width", connlib._endpointSizeThn);
+                    this.svg.appendChild(this.b);
                     this.a = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
                     this.a.style.fill = "#373737";
-                    this.a.style.stroke = "#373737";
                     this.a.style.strokeWidth = 1;
                     this.a.setAttribute("points", c.x + "," + c.y + " " + f1.x + "," + f1.y + " " + f2.x + "," + f2.y);
                     this.svg.appendChild(this.a);
-                    this.b = null;
                 }
                 break;
         }
@@ -1013,9 +1036,9 @@ class connlibEndpoint extends connlibAbstractRenderable {
     /**
      * the method sets the endpoint type
      */
-    setType(type){
+    setType(type) {
         this.type = type;
-        if(this.isRendered()){
+        if (this.isRendered()) {
             this.render();
         }
     }
@@ -1428,7 +1451,7 @@ class connlibExt {
 
     static calcMiddle(element) {
         let d = this.offsetRect(element);
-        return { "left": d.left + (d.width/2), "top": d.top + (d.height/2), "rect": d };
+        return { "left": d.left + (d.width / 2), "top": d.top + (d.height / 2), "rect": d };
     }
 
     static eukDist(p1, p2) {
@@ -1818,7 +1841,7 @@ class connlibExt {
      * the method returns the element's offset rectangle
      * @param {*} element 
      */
-    static offsetRect(element){
+    static offsetRect(element) {
         return {
             top: element.offsetTop,
             left: element.offsetLeft,
