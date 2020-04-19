@@ -150,7 +150,6 @@ class connlib {
                         case connlibLine.lineType.HORIZONTAL:
                             this.dragFlag.source.setTop(event.offsetY);
                             this.dragFlag.target.setTop(event.offsetY);
-                            console.log(this.dragFlag.target.guid);
                             break;
                         case connlibLine.lineType.VERTICAL:
                             this.dragFlag.source.setLeft(event.offsetX);
@@ -350,6 +349,8 @@ class connlibConnection extends connlibAbstractRenderable {
     pathPoints = [];
     lines = [];
     _rendered = false;
+    type = connlibConnection.connectionType.DOTTED;
+
     /**
      * the constructor creates a new instance of a connection
      */
@@ -487,11 +488,27 @@ class connlibConnection extends connlibAbstractRenderable {
         for (let l of this.lines) l.render();
         this._rendered = true;
     }
+    /**
+     * the method sets the connection's type
+     */
+    setType(type){
+        this.type = type;
+        if(this.isRendered()) for(let l of this.lines) l.render();
+    }
+    /**
+     * the constant contains all available connection types
+     */
+    static connectionType = {
+        "DEFAULT": 0,
+        "DOTTED": 1,
+        "DOUBLE": 2
+    }
 }
 
 class connlibLine extends connlibAbstractRenderable {
     hsvg;
     lsvg;
+    msvg;
     type;
     connection;
     source;
@@ -525,12 +542,16 @@ class connlibLine extends connlibAbstractRenderable {
         output.lsvg = document.createElementNS("http://www.w3.org/2000/svg", "path");
         output.lsvg.style.stroke = "#373737";
         output.lsvg.style.strokeWidth = 1;
+        output.msvg = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        output.msvg.style.stroke = "white";
+        output.msvg.style.strokeWidth = 0;
         output.hsvg = document.createElementNS("http://www.w3.org/2000/svg", "path");
         output.hsvg.style.stroke = "transparent";
         output.hsvg.style.strokeWidth = 10;
         output.hsvg.style.zIndex = 5;
         output.updateType();
         output.lsvg.setAttribute("d", "M" + s.c + " " + s.r + " L" + t.c + " " + t.r);
+        output.msvg.setAttribute("d", "M" + s.c + " " + s.r + " L" + t.c + " " + t.r);
         output.hsvg.setAttribute("d", "M" + s.c + " " + s.r + " L" + t.c + " " + t.r);
         s.subscribePositionChange((point, fun, dir) => output.updatePosition(dir));
         t.subscribePositionChange((point, fun, dir) => output.updatePosition(dir));
@@ -565,7 +586,9 @@ class connlibLine extends connlibAbstractRenderable {
      * the method renders the current line
      */
     render() {
+        this.updateConnectionType();
         connlib.instance.container.appendChild(this.lsvg);
+        connlib.instance.container.appendChild(this.msvg);
         connlib.instance.container.appendChild(this.hsvg);
         this.hsvg.addEventListener("mousedown", (event) => {
             event.stopPropagation();
@@ -631,6 +654,28 @@ class connlibLine extends connlibAbstractRenderable {
         }
     }
     /**
+     * the method updates the current instance's line type
+     */
+    updateConnectionType() {
+        switch (this.connection.type) {
+            case connlibConnection.connectionType.DEFAULT:
+                this.lsvg.setAttribute("stroke-dasharray", "0");
+                this.lsvg.style.strokeWidth = 1;
+                this.msvg.style.strokeWidth = 0;
+                break;
+            case connlibConnection.connectionType.DOTTED:
+                this.lsvg.setAttribute("stroke-dasharray", "2");
+                this.lsvg.style.strokeWidth = 1;
+                this.msvg.style.strokeWidth = 0;
+                break;
+            case connlibConnection.connectionType.DOUBLE:
+                this.lsvg.setAttribute("stroke-dasharray", "0");
+                this.lsvg.style.strokeWidth = 3;
+                this.msvg.style.strokeWidth = 1;
+                break;
+        }
+    }
+    /**
      * the method updates the current line and drops it if necessary
      */
     updatePosition(direction) {
@@ -648,6 +693,7 @@ class connlibLine extends connlibAbstractRenderable {
             if (abort) return;
         }
         this.lsvg.setAttribute("d", "M" + this.source.c + " " + this.source.r + " L" + this.target.c + " " + this.target.r);
+        this.msvg.setAttribute("d", "M" + this.source.c + " " + this.source.r + " L" + this.target.c + " " + this.target.r);
         this.hsvg.setAttribute("d", "M" + this.source.c + " " + this.source.r + " L" + this.target.c + " " + this.target.r);
     }
 }
@@ -1208,9 +1254,6 @@ class connlibExt {
 
         let mEl1 = this.calcMiddle(element1);
         let mEl2 = this.calcMiddle(element2);
-
-        console.log(mEl1, mEl2);
-
         var element1Endpoint = null;
         var element2Endpoint = null;
 
