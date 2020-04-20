@@ -48,6 +48,8 @@ class connlib {
 
     static dragFlag = null;
 
+    static afterMouseMoveHanlders = [];
+
     constructor() {
 
     }
@@ -164,6 +166,7 @@ class connlib {
                     connlib.applyTransform();
                     break;
             }
+            for (let h of this.afterMouseMoveHanlders) h(event, h);
         });
         window.addEventListener("mouseup", () => {
             this.dragFlag = null;
@@ -268,6 +271,10 @@ class connlib {
         }
     }
 
+    static subscribeAfterMouseMoveObserver(handler) {
+        this.afterMouseMoveHanlders.push(handler);
+    }
+
     toggleRenderBlockingCells() {
         if (!this._gridCellsRendered) {
             this._gridCellsRendered = true;
@@ -288,6 +295,11 @@ class connlib {
             let elements = document.getElementsByClassName("connlib-element");
             for (let element of elements) element.style.display = "block";
         }
+    }
+
+    static unSubscribeAfterMouseMoveObserver(handler) {
+        let i = this.afterMouseMoveHanlders.indexOf(handler);
+        if (i > -1) this.afterMouseMoveHanlders.splice(i, 1);
     }
 
     updateGrid() {
@@ -397,10 +409,19 @@ class connlibConnection extends connlibAbstractRenderable {
      * the method calculates the connections path
      */
     calculatePath() {
-        this.pathPoints = [];
+        for (let pI = this.pathPoints.length - 1; pI >= 0; pI--) {
+            let p = this.pathPoints[pI];
+            p.remove();
+        }
+        for (let lI = this.lines.length - 1; lI >= 0; lI--) {
+            let l = this.lines[lI];
+            l.remove();
+        }
         if (this.isRendered()) this.clear();
         var direction;
         var dir;
+        this.endpoints[0].calculateCGridE();
+        this.endpoints[1].calculateCGridE();
         switch (this.endpoints[0].direction) {
             case connlibEdgeDirection.TOP:
                 direction = connlibDir.T;
@@ -491,9 +512,9 @@ class connlibConnection extends connlibAbstractRenderable {
     /**
      * the method sets the connection's type
      */
-    setType(type){
+    setType(type) {
         this.type = type;
-        if(this.isRendered()) for(let l of this.lines) l.render();
+        if (this.isRendered()) for (let l of this.lines) l.render();
     }
     /**
      * the constant contains all available connection types
@@ -863,9 +884,21 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 case connlibEdgeDirection.TOP:
                     this.left = r.left;
                     if (this.left < this.source.offsetLeft) {
-                        console.log("TO LEFT");
+                        connlib.subscribeAfterMouseMoveObserver((event, self) => {
+                            this.direction = connlibEdgeDirection.LEFT;
+                            this.setPosition({ left: this.source.offsetLeft, top: (this.source.offsetTop + connlib._gridScale) });
+                            connlib.dragFlag = null;
+                            connlib.unSubscribeAfterMouseMoveObserver(self);
+                        });
+                        return;
                     } else if (this.left > (this.source.offsetLeft + this.source.offsetWidth)) {
-                        console.log("TO RIGHT");
+                        connlib.subscribeAfterMouseMoveObserver((event, self) => {
+                            this.direction = connlibEdgeDirection.RIGHT;
+                            this.setPosition({ left: (this.source.offsetLeft + this.source.offsetWidth), top: (this.source.offsetTop + connlib._gridScale) });
+                            connlib.dragFlag = null;
+                            connlib.unSubscribeAfterMouseMoveObserver(self);
+                        });
+                        return;
                     }
                     if (r.top < this._connGridE.r) {
                         point.unsubscribePositionChange(self);
@@ -880,9 +913,21 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 case connlibEdgeDirection.RIGHT:
                     this.top = r.top;
                     if (this.top < this.source.offsetTop) {
-                        console.log("TO TOP");
+                        connlib.subscribeAfterMouseMoveObserver((event, self) => {
+                            this.direction = connlibEdgeDirection.TOP;
+                            this.setPosition({ left: (this.source.offsetLeft + this.source.offsetWidth - connlib._gridScale), top: this.source.offsetTop });
+                            connlib.dragFlag = null;
+                            connlib.unSubscribeAfterMouseMoveObserver(self);
+                        });
+                        return;
                     } else if (this.top > (this.source.offsetTop + this.source.offsetHeight)) {
-                        console.log("TO BOTTOM");
+                        connlib.subscribeAfterMouseMoveObserver((event, self) => {
+                            this.direction = connlibEdgeDirection.BOTTOM;
+                            this.setPosition({ left: (this.source.offsetLeft + this.source.offsetWidth - connlib._gridScale), top: (this.source.offsetTop + this.source.offsetHeight) });
+                            connlib.dragFlag = null;
+                            connlib.unSubscribeAfterMouseMoveObserver(self);
+                        });
+                        return;
                     }
                     if (r.left > this._connGridE.c) {
                         point.unsubscribePositionChange(self);
@@ -897,9 +942,21 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 case connlibEdgeDirection.BOTTOM:
                     this.left = r.left;
                     if (this.left < this.source.offsetLeft) {
-                        console.log("TO LEFT");
+                        connlib.subscribeAfterMouseMoveObserver((event, self) => {
+                            this.direction = connlibEdgeDirection.LEFT;
+                            this.setPosition({ left: this.source.offsetLeft, top: (this.source.offsetTop + this.source.offsetHeight - connlib._gridScale) });
+                            connlib.dragFlag = null;
+                            connlib.unSubscribeAfterMouseMoveObserver(self);
+                        });
+                        return;
                     } else if (this.left > (this.source.offsetLeft + this.source.offsetWidth)) {
-                        console.log("TO RIGHT");
+                        connlib.subscribeAfterMouseMoveObserver((event, self) => {
+                            this.direction = connlibEdgeDirection.RIGHT;
+                            this.setPosition({ left: (this.source.offsetLeft + this.source.offsetWidth), top: (this.source.offsetTop + this.source.offsetHeight - connlib._gridScale) });
+                            connlib.dragFlag = null;
+                            connlib.unSubscribeAfterMouseMoveObserver(self);
+                        });
+                        return;
                     }
                     if (r.top > this._connGridE.r) {
                         point.unsubscribePositionChange(self);
@@ -914,9 +971,20 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 case connlibEdgeDirection.LEFT:
                     this.top = r.top;
                     if (this.top < this.source.offsetTop) {
-                        console.log("TO TOP");
+                        connlib.subscribeAfterMouseMoveObserver((event, self) => {
+                            this.direction = connlibEdgeDirection.TOP;
+                            this.setPosition({ left: (this.source.offsetLeft + connlib._gridScale), top: this.source.offsetTop });
+                            connlib.dragFlag = null;
+                            connlib.unSubscribeAfterMouseMoveObserver(self);
+                        });
                     } else if (this.top > (this.source.offsetTop + this.source.offsetHeight)) {
-                        console.log("TO BOTTOM");
+                        connlib.subscribeAfterMouseMoveObserver((event, self) => {
+                            this.direction = connlibEdgeDirection.BOTTOM;
+                            this.setPosition({ left: (this.source.offsetLeft + connlib._gridScale), top: (this.source.offsetTop + this.source.offsetHeight) });
+                            connlib.dragFlag = null;
+                            connlib.unSubscribeAfterMouseMoveObserver(self);
+                        });
+                        return;
                     }
                     if (r.left < this._connGridE.c) {
                         point.unsubscribePositionChange(self);
@@ -1066,6 +1134,20 @@ class connlibEndpoint extends connlibAbstractRenderable {
             this.connection.render();
         }
         for (let e of this.onPositionChangeHandlers) e(this, e, connlibLine.lineType.HORIZONTAL);
+    }
+    /**
+     * the method updates the current position
+     */
+    setPosition(position) {
+        this.left = position.left;
+        this.top = position.top;
+        this.calculateCGridE();
+        if (this.isRendered()) {
+            this.render();
+            this.connection.calculatePath();
+            this.connection.render();
+        }
+        for (let e of this.onPositionChangeHandlers) e(this, e, null);
     }
     /**
      * the method updates the endpoint's top coordinate
