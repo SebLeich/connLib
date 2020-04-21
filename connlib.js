@@ -451,9 +451,11 @@ class connlibConnection extends connlibAbstractRenderable {
         if (this.isRendered()) this.clear();
         var direction;
         var dir;
-        this.endpoints[0].calculateCGridE();
-        this.endpoints[1].calculateCGridE();
-        switch (this.endpoints[0].direction) {
+        let e1 = this.endpoints[0];
+        let e2 = this.endpoints[1];
+        e1.calculateCGridE();
+        e2.calculateCGridE();
+        switch (e1.direction) {
             case connlibEdgeDirection.TOP:
                 direction = connlibDir.T;
                 dir = connlibLine.lineType.VERTICAL;
@@ -471,7 +473,14 @@ class connlibConnection extends connlibAbstractRenderable {
                 dir = connlibLine.lineType.HORIZONTAL;
                 break;
         }
-        this.pathPoints = connlibExt.IDAStar(this.connlibInstance, this.endpoints[0], this.endpoints[1], direction);
+        this.pathPoints = connlibExt.IDAStar(this.connlibInstance, e1, e2, direction);
+        /*
+        if(e1.connGridE.c == e2.connGridE.c) {
+            this.pathPoints = [e1.connGridE, e2.connGridE];
+        } else {
+            
+        }
+        */
         for (var i = 1; i < this.pathPoints.length; i++) {
             let s = this.pathPoints[i - 1];
             let t = this.pathPoints[i];
@@ -1355,9 +1364,38 @@ class connlibExt {
 
         let mEl1 = this.calcMiddle(element1);
         let mEl2 = this.calcMiddle(element2);
+        if(mEl1.left == mEl2.left){
+            var t1;
+            var t2;
+            var d1;
+            var d2;
+            if(mEl1.top < mEl2.top){
+                t1 = element1.offsetTop + element1.offsetHeight;
+                t2 = element2.offsetTop;
+                d1 = connlibEdgeDirection.BOTTOM;
+                d2 = connlibEdgeDirection.TOP;
+            } else {
+                t1 = element1.offsetTop;
+                t2 = element2.offsetTop + element2.offsetHeight;
+                d1 = connlibEdgeDirection.TOP;
+                d2 = connlibEdgeDirection.BOTTOM;
+            }
+            return [new connlibEndpoint(connlibInstance, element1, null, {
+                "parallely": false,
+                "identical": false,
+                "left": mEl1.left,
+                "top": t1,
+                "direction": d1
+            }), new connlibEndpoint(connlibInstance, element2, null, {
+                "parallely": false,
+                "identical": false,
+                "left": mEl2.left,
+                "top": t2,
+                "direction": d2
+            })];
+        }
         var element1Endpoint = null;
         var element2Endpoint = null;
-
         let fun = this.calcFunForTwoPoints(mEl1, mEl2);
 
         var p1 = {
