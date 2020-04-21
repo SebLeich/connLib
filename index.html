@@ -2,6 +2,7 @@
 
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="icon" href="icon.svg">
     <script src="connlib.js"></script>
 </head>
 
@@ -12,6 +13,13 @@
     <div class="element el4 connlib-element connlib-block" id="el4" style="z-index: 5;">
         <div class="element el5 connlib-element" id="el5" style="z-index: 5;">roletype 1</div>
         <div class="element el6 connlib-element" id="el6" style="z-index: 5;">roletype 2</div>
+    </div>
+    <div id="goto-github">
+        <img class="icon" src="icon.svg"/>
+        <div class="text">
+            <div>Goto repo</div>
+            <div class="subtitle">Github</div>
+        </div>
     </div>
 </body>
 <style>
@@ -25,6 +33,32 @@
         margin: 0px;
         padding: 0px;
         overflow: hidden;
+    }
+
+    #goto-github {
+        padding: 5px 10px;
+        background-color: rgba(0, 0, 0, 0.65);
+        color: white;
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+        border-radius: 5px;
+        z-index: 100;
+        cursor: pointer;
+        display: flex;
+    }
+
+    #goto-github .icon {
+        height: 37px;
+    }
+
+    #goto-github .text {
+        padding-left: 7px;
+    }
+
+    #goto-github .text .subtitle {
+        font-size: 1.4rem;
+        color: #3da6f0;
     }
 
     .background-grid {
@@ -155,6 +189,7 @@
             i2.render();
             let end_time = new Date();
             console.log("EXECUTION FINISHED, MS: " + (end_time.getTime() - start_time.getTime()));
+            document.getElementById("goto-github").addEventListener("click", () => window.location.href = "https://github.com/SebLeich/connLib");
         }
     }
 </script>
