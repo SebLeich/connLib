@@ -181,17 +181,19 @@ class connlib {
             }
         });
         window.addEventListener("mousemove", (event) => {
+            let c = connlibExt.cumulativeOffset(event.target);
+            let corr = {left:event.offsetX+c.left,top:event.offsetY+c.top};
             if (!this.dragFlag) return;
             switch (this.dragFlag.constructor) {
                 case connlibLine:
                     switch (this.dragFlag.type) {
                         case connlibLine.lineType.HORIZONTAL:
-                            this.dragFlag.source.setTop(event.offsetY);
-                            this.dragFlag.target.setTop(event.offsetY);
+                            this.dragFlag.source.setTop(corr.top-parseFloat(this.dragFlag.connlibInstance.svg.style.top));
+                            this.dragFlag.target.setTop(corr.top-parseFloat(this.dragFlag.connlibInstance.svg.style.top));
                             break;
                         case connlibLine.lineType.VERTICAL:
-                            this.dragFlag.source.setLeft(event.offsetX);
-                            this.dragFlag.target.setLeft(event.offsetX);
+                            this.dragFlag.source.setLeft(corr.left-parseFloat(this.dragFlag.connlibInstance.svg.style.left));
+                            this.dragFlag.target.setLeft(corr.left-parseFloat(this.dragFlag.connlibInstance.svg.style.left));
                             break;
                     }
                     break;
@@ -1630,12 +1632,44 @@ class connlibExt {
             "top": fun1.m * x + fun1.n
         };
     }
-
+    /**
+     * the method calculates the element's middle
+     * @param {*} element 
+     */
     static calcMiddle(element) {
         let d = this.offsetRect(element);
         return { "left": d.left + (d.width / 2), "top": d.top + (d.height / 2), "rect": d };
     }
-
+    /**
+     * the method returns the element's cumultative offset
+     * @param {*} element 
+     */
+    static cumulativeOffset(element) {
+        var top = 0, left = 0;
+        var last = element;
+        do {
+            if(element.tagName == "svg"){
+                top += parseFloat(element.style.top) || 0;
+                left += parseFloat(element.style.left) || 0;
+                last = element;
+                element = element.parentNode;
+            } else {
+                top += element.offsetTop  || 0;
+                left += element.offsetLeft || 0;
+                last = element;
+                element = element.parentNode;
+            }
+        } while(element);
+        return {
+            top: top,
+            left: left
+        };
+    };
+    /**
+     * the method calculates the euclydean distance between two points
+     * @param {*} p1 
+     * @param {*} p2 
+     */
     static eukDist(p1, p2) {
         return Math.sqrt(Math.pow(p1.left - p2.left, 2) + Math.pow(p1.top - p2.top, 2))
     }
