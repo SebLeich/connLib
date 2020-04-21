@@ -6,7 +6,6 @@
 </head>
 
 <body id="body">
-    <svg id="background-grid"></svg>
     <div class="element el1 connlib-element connlib-block" id="el1" style="z-index: 5;"></div>
     <div class="element el2 connlib-element connlib-block" id="el2" style="z-index: 5;"></div>
     <div class="element el3 connlib-element connlib-block" id="el3" style="z-index: 5;"></div>
@@ -24,7 +23,7 @@
         position: fixed;
     }
 
-    #background-grid {
+    .background-grid {
         position: absolute;
         z-index: 1;
         border: 1px solid;
@@ -100,11 +99,11 @@
         position: absolute;
     }
 
-    .connlib-connection-hor, .connlib-estag-hor {
+    .connlib-connection-hor {
         cursor: row-resize;
     }
 
-    .connlib-connection-ver, .connlib-estag-ver {
+    .connlib-connection-ver {
         cursor: col-resize;
     }
 
@@ -118,12 +117,13 @@
     let start_time = new Date();
     document.onreadystatechange = function () {
         if (document.readyState == "interactive") {
-            connlib.init("background-grid");
+            connlib.init();
+            let i = new connlib(document.getElementById("body"));
             connlib.connect("el1", "el2");
             connlib.connect("el2", "el3");
             connlib.connect("el4", "el1");
             connlib.connect("el4", "el3");
-            connlib.instance.render();
+            i.render();
             let end_time = new Date();
             console.log("EXECUTION FINISHED, MS: " + (end_time.getTime() - start_time.getTime()));
         }
