@@ -4,6 +4,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="icon" href="icon.svg">
     <script src="connlib.js"></script>
+    <script src="data.json"></script>
 </head>
 
 <body>
@@ -77,7 +78,6 @@
     .background-grid {
         position: absolute;
         z-index: 1;
-        border: 1px solid black;
         background-size: 10px 10px;
         background-image:
             linear-gradient(to right, rgb(241, 241, 241) 1px, transparent 1px),
@@ -190,14 +190,18 @@
     let start_time = new Date();
     document.onreadystatechange = function () {
         if (document.readyState == "interactive") {
+            connlibExt.readTextFile("data.json", function(text){
+                var data = JSON.parse(text);
+                console.log(data);
+            });
             connlib.init();
-            let i1 = new connlib(document.getElementById("body"));
+            let i1 = new connlib("body");
             i1.connect("el1", "el2");
             i1.connect("el2", "el3");
             i1.connect("el4", "el1");
             i1.connect("el4", "el3");
             i1.render();
-            let i2 = new connlib(document.getElementById("el4"));
+            let i2 = new connlib("el4");
             i2.connect("el5", "el6");
             i2.render();
             let end_time = new Date();

@@ -10,12 +10,30 @@ class connlibAbstractRenderable {
         this.connlibInstance = connlibInstance;
     }
 }
-
+/**
+ * the class contains th core connlib object
+ */
 class connlib {
 
     // connlib-block - default elements, whose should not be overlapping with edges (margin = 1 * grid size)
     // connlib-block-a-top, connlib-block-a-right, connlib-block-a-bottom, connlib-block-a-left
     // connlib-element - all elements within the connlib domain
+
+    guid;
+    svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+
+    containerId;
+    container;
+    connections = [];
+    endpoints = [];
+    breakPoints = [];
+    lines = [];
+
+    _internalGrid;
+
+    _renderCellsWalkable = true;
+    _renderCellsNotWalkable = true;
+    _gridCellsRendered = false;
 
     static instances = [];
     static moveX = 0; // x-transform property
@@ -24,40 +42,21 @@ class connlib {
     static initialized = false;
     static invertMoveDirection = false;
     static gridPadding = 80; // the padding of the background grids
-
-    guid;
-    svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-
-    _connections = [];
-    _endpoints = [];
-    _breakPoints = [];
-    _renderGrid = false;
-    _internalGrid;
-    _lines = [];
-
-    _moveStep = 20;
-    _elementMargin = 10; // reserved margin around blocking elements
-
-    _renderCellsWalkable = true;
-    _renderCellsNotWalkable = true;
-    _gridCellsRendered = false;
-
-    container = null;
-
-    // how far should the endpoints stand out?
-    static _endpointStag = 20;
-    // how big should the endpoints be?
-    static _endpointSizeThk = 20;
-    static _endpointSizeThn = 10;
-    static dragFlag = null;
+    static _endpointStag = 20;    // how far should the endpoints stand out?
+    static _endpointSizeThk = 20; // how big should the endpoints be?
+    static _endpointSizeThn = 10; // how big should the endpoints be?
+    static dragFlag = null;       // current dragged element
     static afterMouseMoveHanlders = [];
+    static moveStep = 20;
 
     /**
      * the constructor creates a new connlib instance within the passed parent
      * @param {*} parent node
      */
-    constructor(parent) {
-        this.container = parent;
+    constructor(parentId) {
+        this.containerId = parentId;
+        this.container = document.getElementById(parentId);
+        if(!this.container) throw("cannot create connlib instance: parent id is not referencing a dom object");
         connlibExt.overprintGuid(this, "guid");
         this.svg.id = this.guid;
         this.svg.classList.add("background-grid");
@@ -76,8 +75,8 @@ class connlib {
      */
     clear() {
         if (!this.instance) return;
-        for (let e of this.instance._endpoints) e.clear();
-        for (let c of this.instance._connections) c.clear();
+        for (let e of this.instance.endpoints) e.clear();
+        for (let c of this.instance.connections) c.clear();
     }
     /**
      * the method removes all breakpoints from the dom
@@ -116,12 +115,6 @@ class connlib {
         }
     }
     /**
-     * the method returns the instances parent container id
-     */
-    get containerId() {
-        return this.container.id;
-    }
-    /**
      * the method adds a customn point to the current instance
      * @param {*} data 
      */
@@ -155,20 +148,20 @@ class connlib {
         window.addEventListener("keyup", (event) => {
             switch (event.keyCode) {
                 case 37:
-                    if (this.invertMoveDirection) this.instance._moveX -= this.instance._moveStep;
-                    this.instance._moveX += this.instance._moveStep;
+                    if (this.invertMoveDirection) this.instance._moveX -= connlib.moveStep;
+                    this.instance._moveX += connlib.moveStep;
                     break;
                 case 38:
-                    if (this.invertMoveDirection) this.instance._moveY -= this.instance._moveStep;
-                    this.instance._moveY += this.instance._moveStep;
+                    if (this.invertMoveDirection) this.instance._moveY -= connlib.moveStep;
+                    this.instance._moveY += connlib.moveStep;
                     break;
                 case 39:
-                    if (this.invertMoveDirection) this.instance._moveX += this.instance._moveStep;
-                    this.instance._moveX -= this.instance._moveStep;
+                    if (this.invertMoveDirection) this.instance._moveX += connlib.moveStep;
+                    this.instance._moveX -= connlib.moveStep;
                     break;
                 case 40:
-                    if (this.invertMoveDirection) this.instance._moveY += this.instance._moveStep;
-                    this.instance._moveY -= this.instance._moveStep;
+                    if (this.invertMoveDirection) this.instance._moveY += connlib.moveStep;
+                    this.instance._moveY -= connlib.moveStep;
                     break;
             }
             this.applyTransform();
@@ -218,7 +211,7 @@ class connlib {
     static markAllBreakpoints(){
         this.clearAllBreakpoints();
         for(let i of this.instances){
-            for(let b of i._breakPoints) b.mark();
+            for(let b of i.breakPoints) b.mark();
         }
     }
     /**
@@ -306,8 +299,8 @@ class connlib {
      */
     render() {
         this.clear();
-        for (let e of this._endpoints) e.render();
-        for (let c of this._connections) {
+        for (let e of this.endpoints) e.render();
+        for (let c of this.connections) {
             c.calculatePath();
             c.render();
         }
@@ -413,7 +406,7 @@ class connlibConnection extends connlibAbstractRenderable {
     pathPoints = [];
     lines = [];
     _rendered = false;
-    type = connlibConnection.connectionType.DOTTED;
+    type = connlibConnection.connectionType.DEFAULT;
     /**
      * the constructor creates a new instance of a connection
      */
@@ -430,7 +423,7 @@ class connlibConnection extends connlibAbstractRenderable {
                 this.endpoints.push(e);
             }
         }
-        connlibInstance._connections.push(this);
+        connlibInstance.connections.push(this);
     }
     /**
      * the method returns the dom visualization of the current connection
@@ -584,7 +577,7 @@ class connlibLine extends connlibAbstractRenderable {
     constructor(connlibInstance) {
         super(connlibInstance);
         connlibExt.overprintGuid(this, "guid");
-        connlibInstance._lines.push(this);
+        connlibInstance.lines.push(this);
     }
     /**
      * the method removes the element from the dom
@@ -643,8 +636,8 @@ class connlibLine extends connlibAbstractRenderable {
         if (tI > -1) this.target.lines.splice(tI, 1);
         let cI = this.connection.lines.indexOf(this);
         if (cI > -1) this.connection.lines.splice(cI, 1);
-        let lI = this.connlibInstance._lines.indexOf(this);
-        if (lI > -1) this.connlibInstance._lines.splice(lI, 1);
+        let lI = this.connlibInstance.lines.indexOf(this);
+        if (lI > -1) this.connlibInstance.lines.splice(lI, 1);
         if (connlib.dragFlag == this) connlib.dragFlag = null;
         this.clear();
     }
@@ -798,7 +791,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
             this.top = positioning.top;
             this.direction = positioning.direction;
         }
-        connlibInstance._endpoints.push(this);
+        connlibInstance.endpoints.push(this);
         source.addEventListener("positionChange", (event) => {
             console.log("update ", this, event);
         });
@@ -1050,7 +1043,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
         var pb = null; // port base point
         switch (this.direction) {
             case connlibEdgeDirection.TOP:
-                this.svg.style.left = this.left - (connlib._endpointSizeThk / 2) + 1 + this.connlibInstance.container.offsetLeft;
+                this.svg.style.left = this.left - (connlib._endpointSizeThk / 2) + this.connlibInstance.container.offsetLeft;
                 this.svg.style.top = this.top - connlib._endpointStag +  this.connlibInstance.container.offsetTop;
                 this.svg.style.height = connlib._endpointSizeThn + connlib._endpointStag;
                 this.svg.style.width = connlib._endpointSizeThk;
@@ -1062,8 +1055,8 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 pb = { x: f1.x, y: (c.y - (connlib._endpointSizeThn / 2)) };
                 break;
             case connlibEdgeDirection.RIGHT:
-                this.svg.style.left = this.left - connlib._endpointSizeThn + 1 + this.connlibInstance.container.offsetLeft;
-                this.svg.style.top = this.top - (connlib._endpointSizeThk / 2) + 1 +  this.connlibInstance.container.offsetTop;
+                this.svg.style.left = this.left - connlib._endpointSizeThn + this.connlibInstance.container.offsetLeft;
+                this.svg.style.top = this.top - (connlib._endpointSizeThk / 2) +  this.connlibInstance.container.offsetTop;
                 this.svg.style.height = connlib._endpointSizeThk;
                 this.svg.style.width = connlib._endpointSizeThn + connlib._endpointStag;
                 this.svg.classList.add("connlib-estag-hor");
@@ -1074,8 +1067,8 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 pb = { x: (c.x - (connlib._endpointSizeThn / 2)), y: f1.y };
                 break;
             case connlibEdgeDirection.BOTTOM:
-                this.svg.style.left = this.left - (connlib._endpointSizeThk / 2) + 1 +  this.connlibInstance.container.offsetLeft;
-                this.svg.style.top = this.top - (connlib._endpointSizeThn) + 1 +  this.connlibInstance.container.offsetTop;
+                this.svg.style.left = this.left - (connlib._endpointSizeThk / 2) +  this.connlibInstance.container.offsetLeft;
+                this.svg.style.top = this.top - (connlib._endpointSizeThn) +  this.connlibInstance.container.offsetTop;
                 this.svg.style.height = connlib._endpointSizeThn + connlib._endpointStag;
                 this.svg.style.width = connlib._endpointSizeThk;
                 this.svg.classList.add("connlib-estag-ver");
@@ -1087,7 +1080,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 break;
             case connlibEdgeDirection.LEFT:
                 this.svg.style.left = this.left - connlib._endpointStag + this.connlibInstance.container.offsetLeft;
-                this.svg.style.top = this.top - (connlib._endpointSizeThk / 2) + 1 +  this.connlibInstance.container.offsetTop;
+                this.svg.style.top = this.top - (connlib._endpointSizeThk / 2) +  this.connlibInstance.container.offsetTop;
                 this.svg.style.height = connlib._endpointSizeThk;
                 this.svg.style.width = connlib._endpointSizeThn + connlib._endpointStag;
                 this.svg.classList.add("connlib-estag-hor");
@@ -1238,7 +1231,7 @@ class connlibBreakPoint extends connlibAbstractRenderable {
     constructor(connlibInstance, object) {
         super(connlibInstance);
         connlibExt.overprintGuid(this, "guid");
-        connlibInstance._breakPoints.push(this);
+        connlibInstance.breakPoints.push(this);
         this.c = object.c;
         this.r = object.r;
     }
@@ -1264,8 +1257,8 @@ class connlibBreakPoint extends connlibAbstractRenderable {
     remove() {
         let cI = this.connection.pathPoints.indexOf(this);
         if (cI > -1) this.connection.pathPoints.splice(cI, 1);
-        let i = this.connlibInstance._breakPoints.indexOf(this);
-        if (i > -1) this.connlibInstance._breakPoints.splice(i, 1);
+        let i = this.connlibInstance.breakPoints.indexOf(this);
+        if (i > -1) this.connlibInstance.breakPoints.splice(i, 1);
     }
     /**
      * the method updates the endpoint's left coordinate
@@ -1778,6 +1771,22 @@ class connlibExt {
             s.seq = i;
             i++;
         }
+    }
+    /**
+     * the method loads a json file
+     * @param {*} file 
+     * @param {*} callback 
+     */
+    static readTextFile(file, callback) {
+        var rawFile = new XMLHttpRequest();
+        rawFile.overrideMimeType("application/json");
+        rawFile.open("GET", file, true);
+        rawFile.onreadystatechange = function() {
+            if (rawFile.readyState === 4 && rawFile.status == "200") {
+                callback(rawFile.responseText);
+            }
+        }
+        rawFile.send(null);
     }
     /**
      * the method returns the 
