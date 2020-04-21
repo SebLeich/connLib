@@ -80,6 +80,13 @@ class connlib {
         for (let c of this.instance._connections) c.clear();
     }
     /**
+     * the method removes all breakpoints from the dom
+     */
+    static clearAllBreakpoints(){
+        let breakPoints = document.getElementsByClassName("breakpoint-marker");
+        for(let b of breakPoints) b.parentNode.removeChild(b);
+    }
+    /**
      * the method enables user's to connect 2 dom elements and returns whether a connection can be established
      * @param {*} source dom identifier 
      * @param {*} target dom identifier
@@ -113,6 +120,19 @@ class connlib {
      */
     get containerId() {
         return this.container.id;
+    }
+    /**
+     * the method adds a customn point to the current instance
+     * @param {*} data 
+     */
+    customPoint(data){
+        let p = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        p.setAttribute("cx", data.left);
+        p.setAttribute("cy", data.top);
+        p.setAttribute("r", data.radius);
+        p.setAttribute("fill", data.color);
+        if(Array.isArray(data.classes)) for(let c of data.classes) p.classList.add(c);
+        this.svg.appendChild(p);
     }
     /**
      * the method returns a connlib instance by guid
@@ -190,17 +210,13 @@ class connlib {
         this.initialized = true;
     }
     /**
-     * the method returns the given element's offset rectangle
-     * @param {*} element 
+     * the method sets a marks all breakpoints on the dom
      */
-    static offset(element) {
-        let o = { "top": null, "left": null, "height": null, "width": null };
-        if (element) {
-            var rect = element.getBoundingClientRect();
-            o.top = rect.top + document.body.scrollTop;
-            o.left = rect.left + document.body.scrollLeft;
+    static markAllBreakpoints(){
+        this.clearAllBreakpoints();
+        for(let i of this.instances){
+            for(let b of i._breakPoints) b.mark();
         }
-        return o;
     }
     /**
      * the method melts two points, drops one of them and connects all connections of the removed with the leaved
@@ -240,6 +256,19 @@ class connlib {
             return true;
         }
         return false;
+    }
+    /**
+     * the method returns the given element's offset rectangle
+     * @param {*} element 
+     */
+    static offset(element) {
+        let o = { "top": null, "left": null, "height": null, "width": null };
+        if (element) {
+            var rect = element.getBoundingClientRect();
+            o.top = rect.top + document.body.scrollTop;
+            o.left = rect.left + document.body.scrollLeft;
+        }
+        return o;
     }
     /**
      * the method renders a point at the given position with the given color
@@ -1206,6 +1235,16 @@ class connlibBreakPoint extends connlibAbstractRenderable {
      */
     get left() {
         return this.c;
+    }
+    /**
+     * the method marks the current endpoint on the connlib instance
+     */
+    mark(){
+        let color = "orange";
+        if(this._isEP){
+            color = "red";
+        }
+        this.connlibInstance.customPoint({left:this.c,top:this.r,color:color,radius:"2",classes:["breakpoint-marker"]});
     }
     /**
      * the method removes a breakpoint from the current data model
