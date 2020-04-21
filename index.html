@@ -19,7 +19,7 @@
     <div id="goto-github">
         <img class="icon" src="icon.svg"/>
         <div class="text">
-            <div>Goto repo</div>
+            <div class="headline">Goto repository</div>
             <div class="subtitle">Github</div>
         </div>
     </div>
@@ -50,12 +50,23 @@
         display: flex;
     }
 
+    #goto-github:hover {
+        -webkit-box-shadow: 0px 0px 20px 0px rgba(56, 151, 206, 0.75);
+        -moz-box-shadow: 0px 0px 20px 0px rgba(56, 151, 206, 0.75);
+        box-shadow: 0px 0px 20px 0px rgba(56, 151, 206, 0.75);
+        transition: all .5s;
+    }
+
     #goto-github .icon {
         height: 37px;
     }
 
     #goto-github .text {
         padding-left: 7px;
+    }
+
+    #goto-github .text .headline {
+        font-size: .7rem;
     }
 
     #goto-github .text .subtitle {

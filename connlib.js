@@ -186,14 +186,15 @@ class connlib {
             if (!this.dragFlag) return;
             switch (this.dragFlag.constructor) {
                 case connlibLine:
+                    let i = connlibExt.cumulativeOffset(this.dragFlag.connlibInstance.svg);
                     switch (this.dragFlag.type) {
                         case connlibLine.lineType.HORIZONTAL:
-                            this.dragFlag.source.setTop(corr.top-parseFloat(this.dragFlag.connlibInstance.svg.style.top));
-                            this.dragFlag.target.setTop(corr.top-parseFloat(this.dragFlag.connlibInstance.svg.style.top));
+                            this.dragFlag.source.setTop(corr.top-i.top);
+                            this.dragFlag.target.setTop(corr.top-i.top);
                             break;
                         case connlibLine.lineType.VERTICAL:
-                            this.dragFlag.source.setLeft(corr.left-parseFloat(this.dragFlag.connlibInstance.svg.style.left));
-                            this.dragFlag.target.setLeft(corr.left-parseFloat(this.dragFlag.connlibInstance.svg.style.left));
+                            this.dragFlag.source.setLeft(corr.left-i.left);
+                            this.dragFlag.target.setLeft(corr.left-i.left);
                             break;
                     }
                     break;
