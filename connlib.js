@@ -48,6 +48,8 @@ class connlib {
     static dragFlag = null;       // current dragged element
     static afterMouseMoveHanlders = [];
     static moveStep = 20;
+    static parent;
+    static currentMouseover = null;
 
     /**
      * the constructor creates a new connlib instance within the passed parent
@@ -143,7 +145,8 @@ class connlib {
     /**
      * the method initializes the connlib library
      */
-    static init() {
+    static init(parent) {
+        this.parent = document.getElementById(parent);
         this.applyTransform();
         window.addEventListener("keyup", (event) => {
             switch (event.keyCode) {
@@ -170,7 +173,12 @@ class connlib {
             if (this.dragFlag == null) {
                 event.preventDefault();
                 event.stopPropagation();
-                this.dragFlag = new connlibPan(event.clientX, event.clientY, connlib.moveX, connlib.moveY);
+                if(event.target.classList.contains("connlib-connectable")){
+                    let c = connlibExt.cumulativeOffset(event.target);
+                    this.dragFlag = new connlibCCreate(c.left + event.offsetX, c.top + event.offsetY, event.target);
+                } else {
+                    this.dragFlag = new connlibPan(event.clientX, event.clientY, connlib.moveX, connlib.moveY);
+                }
             }
         });
         window.addEventListener("mousemove", (event) => {
@@ -197,12 +205,26 @@ class connlib {
                     connlib.moveY = t.y;
                     connlib.applyTransform();
                     break;
+                case connlibCCreate:
+                    this.dragFlag.updateTarget(c.left + event.offsetX, c.top + event.offsetY);
+                    break;
             }
             for (let h of this.afterMouseMoveHanlders) h(event, h);
         });
         window.addEventListener("mouseup", () => {
+            if(typeof(this.dragFlag.destroy) == "function") this.dragFlag.destroy();
             this.dragFlag = null;
         });
+        let connectables = document.getElementsByClassName("connlib-connectable");
+        for(let element of connectables){
+            element.addEventListener("mouseenter", function(){
+                connlib.currentMouseover = this;
+            });
+            element.addEventListener("mouseleave", function(){
+                this.classList.remove("connlib-cconnector-target");
+                connlib.currentMouseover = null;
+            });
+        }
         this.initialized = true;
     }
     /**
@@ -373,6 +395,67 @@ class connlib {
                     this._internalGrid.cells[row][col].w = 0;
                 }
             }
+        }
+    }
+}
+/**
+ * the class contains a connector creation metadata
+ */
+class connlibCCreate {
+    mouseX;
+    mouseY;
+    source;
+    svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    pathH = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    /**
+     * the constructor creates a new connector creation helper
+     */
+    constructor(x, y, s){
+        this.mouseX = x;
+        this.mouseY = y;
+        this.source = s;
+        this.svg.style.left = this.mouseX - 20;
+        this.svg.style.top = this.mouseY - 20;
+        this.svg.style.height = 40;
+        this.svg.style.width = 40;
+        this.svg.classList.add("cconnector-panel");
+        this.pathH.classList.add("cconnector-bg");
+        this.path.style.stroke = "black";
+        this.path.style.strokeWidth = 1;
+        this.svg.appendChild(this.pathH);
+        this.svg.appendChild(this.path);
+        connlib.parent.appendChild(this.svg);
+        this.source.classList.add("connlib-cconnector-start");
+        connlib.currentMouseover = null;
+    }
+    /**
+     * the method destroys the current instance
+     */
+    destroy(){
+        this.source.classList.remove("connlib-cconnector-start");
+        this.svg.parentNode.removeChild(this.svg);
+        if(this.source && connlib.currentMouseover){
+            connlib.instances[0].connect(this.source.id, connlib.currentMouseover.id);
+            connlib.instances[0].render();
+        }
+    }
+    /**
+     * the method updates the target position
+     */
+    updateTarget(x, y){
+        let l = Math.min(this.mouseX, x) - 20;
+        let w = Math.max(this.mouseX, x) - l + 20;
+        this.svg.style.left = l;
+        this.svg.style.width = w;
+        let t = Math.min(this.mouseY, y) - 20;
+        let h = Math.max(this.mouseY, y) - t + 20;
+        this.svg.style.top = t;
+        this.svg.style.height = h;
+        this.pathH.setAttribute("d", "M" + (this.mouseX - l) + "," + (this.mouseY - t) + " " + (x - l) + "," + (y - t));
+        this.path.setAttribute("d", "M" + (this.mouseX - l) + "," + (this.mouseY - t) + " " + (x - l) + "," + (y - t));
+        if(connlib.currentMouseover){
+            connlib.currentMouseover.classList.add("connlib-cconnector-target");
         }
     }
 }
