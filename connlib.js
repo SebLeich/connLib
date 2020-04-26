@@ -839,6 +839,8 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 corrT -= connlib._endpointStag;
                 break;
             case connlibEdgeDirection.LEFT:
+
+                break;
             case connlibEdgeDirection.RIGHT:
                 corrL -= connlib._endpointStag;
                 break;
@@ -907,6 +909,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
         });
         p.subscribePositionChange((point, self) => {
             let r = this.calculateElementPointFromCGridE(point);
+            let c = connlibExt.cumulativeOffset(this.connlibInstance.svg);
             switch (this.direction) {
                 case connlibEdgeDirection.TOP:
                     this.left = r.left;
@@ -996,7 +999,8 @@ class connlibEndpoint extends connlibAbstractRenderable {
                     }
                     break;
                 case connlibEdgeDirection.LEFT:
-                    this.top = r.top;
+                    this.top = point.r + c.top;
+                    var left = point.c + c.left + connlib._endpointStag;
                     if (this.top < this.source.offsetTop) {
                         connlib.subscribeAfterMouseMoveObserver((event, self) => {
                             this.direction = connlibEdgeDirection.TOP;
@@ -1013,7 +1017,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
                         });
                         return;
                     }
-                    if (r.left < this._connGridE.c) {
+                    if(this.left > left){
                         point.unsubscribePositionChange(self);
                         let ref = this.reference();
                         ref.connection = point.connection;
@@ -1686,25 +1690,24 @@ class connlibExt {
     static IDAStar(connlibInstance, e1, e2, direction) {
         let source = e1.connGridE;
         let target = e2.connGridE;
-        var costs = {}
+        var costs = {};
         var stack = {};
-        var threshold = this.manhattenDistance(source, target);
+        var threshold = this.manhattanDistance(source, target);
         stack[threshold.toString()] = {};
         stack[threshold.toString()][source.r] = source;
         var found = false;
-        let max = 5000;
+        let max = 100000;
         var i = 0;
         var s = source;
         s.d = direction;
         s.p = 1;
         s.a = [];
-        var collisionFlag = null;
         while (!found) {
             if (i == max) {
                 console.log(stack, connlibInstance, e1, e2, direction);
                 throw ("maximum number of loops reached!");
             }
-            let frontier = this.surroundingManhattenMinimumCells(connlibInstance, s, target);
+            let frontier = this.surroundingManhattanMinimumCells(connlibInstance, s, target);
             var next = null;
             for (let c of frontier) {
                 if (!stack[c.d.toString()]) stack[c.d.toString()] = {};
@@ -1713,7 +1716,6 @@ class connlibExt {
                 } else continue;
                 if (c.d < threshold) {
                     threshold = c.d;
-                    if (collisionFlag) collisionFlag = null;
                 }
                 if (c.o.r == target.r && c.o.c == target.c) {
                     found = true;
@@ -1791,12 +1793,12 @@ class connlibExt {
     /**
      * the method returns the 
      * @param {*} source centered cell
-     * @param {*} target connection's target for manhatten distance
+     * @param {*} target connection's target for manhattan distance
      */
-    static surroundingManhattenMinimumCells(connlibInstance, source, target) {
+    static surroundingManhattanMinimumCells(connlibInstance, source, target) {
         let s = this.surroundingCellsNoDiag(connlibInstance, source);
         return s.map(x => {
-            return { "d": this.manhattenDistance(x, target), "o": x }
+            return { "d": this.manhattanDistance(x, target), "o": x }
         });
     }
     /**
@@ -1827,11 +1829,11 @@ class connlibExt {
         return o;
     }
     /**
-     * the method returns the manhatten distance between the two points
+     * the method returns the manhattan distance between the two points
      * @param {*} p1 first point
      * @param {*} p2 second point
      */
-    static manhattenDistance(p1, p2) {
+    static manhattanDistance(p1, p2) {
         return Math.abs(p1.r - p2.r) + Math.abs(p1.c - p2.c);
     }
     /**
