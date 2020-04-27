@@ -58,7 +58,7 @@ class connlib {
     constructor(parentId) {
         this.containerId = parentId;
         this.container = document.getElementById(parentId);
-        if(!this.container) throw("cannot create connlib instance: parent id is not referencing a dom object");
+        if (!this.container) throw ("cannot create connlib instance: parent id is not referencing a dom object");
         connlibExt.overprintGuid(this, "guid");
         this.svg.id = this.guid;
         this.svg.classList.add("background-grid");
@@ -83,9 +83,9 @@ class connlib {
     /**
      * the method removes all breakpoints from the dom
      */
-    static clearAllBreakpoints(){
+    static clearAllBreakpoints() {
         let breakPoints = document.getElementsByClassName("breakpoint-marker");
-        for(let b of breakPoints) b.parentNode.removeChild(b);
+        for (let b of breakPoints) b.parentNode.removeChild(b);
     }
     /**
      * the method enables user's to connect 2 dom elements and returns whether a connection can be established
@@ -120,13 +120,13 @@ class connlib {
      * the method adds a customn point to the current instance
      * @param {*} data 
      */
-    customPoint(data){
+    customPoint(data) {
         let p = document.createElementNS("http://www.w3.org/2000/svg", "circle");
         p.setAttribute("cx", data.left);
         p.setAttribute("cy", data.top);
         p.setAttribute("r", data.radius);
         p.setAttribute("fill", data.color);
-        if(Array.isArray(data.classes)) for(let c of data.classes) p.classList.add(c);
+        if (Array.isArray(data.classes)) for (let c of data.classes) p.classList.add(c);
         this.svg.appendChild(p);
     }
     /**
@@ -173,7 +173,7 @@ class connlib {
             if (this.dragFlag == null) {
                 event.preventDefault();
                 event.stopPropagation();
-                if(event.target.classList.contains("connlib-connectable")){
+                if (event.target.classList.contains("connlib-connectable")) {
                     let c = connlibExt.cumulativeOffset(event.target);
                     this.dragFlag = new connlibCCreate(c.left + event.offsetX, c.top + event.offsetY, event.target);
                 } else {
@@ -183,19 +183,19 @@ class connlib {
         });
         window.addEventListener("mousemove", (event) => {
             let c = connlibExt.cumulativeOffset(event.target);
-            let corr = {left:event.offsetX+c.left,top:event.offsetY+c.top};
+            let corr = { left: event.offsetX + c.left, top: event.offsetY + c.top };
             if (!this.dragFlag) return;
             switch (this.dragFlag.constructor) {
                 case connlibLine:
                     let i = connlibExt.cumulativeOffset(this.dragFlag.connlibInstance.svg);
                     switch (this.dragFlag.type) {
                         case connlibLine.lineType.HORIZONTAL:
-                            this.dragFlag.source.setTop(corr.top-i.top);
-                            this.dragFlag.target.setTop(corr.top-i.top);
+                            this.dragFlag.source.setTop(corr.top - i.top);
+                            this.dragFlag.target.setTop(corr.top - i.top);
                             break;
                         case connlibLine.lineType.VERTICAL:
-                            this.dragFlag.source.setLeft(corr.left-i.left);
-                            this.dragFlag.target.setLeft(corr.left-i.left);
+                            this.dragFlag.source.setLeft(corr.left - i.left);
+                            this.dragFlag.target.setLeft(corr.left - i.left);
                             break;
                     }
                     break;
@@ -212,15 +212,15 @@ class connlib {
             for (let h of this.afterMouseMoveHanlders) h(event, h);
         });
         window.addEventListener("mouseup", () => {
-            if(typeof(this.dragFlag.destroy) == "function") this.dragFlag.destroy();
+            if (typeof (this.dragFlag.destroy) == "function") this.dragFlag.destroy();
             this.dragFlag = null;
         });
         let connectables = document.getElementsByClassName("connlib-connectable");
-        for(let element of connectables){
-            element.addEventListener("mouseenter", function(){
+        for (let element of connectables) {
+            element.addEventListener("mouseenter", function () {
                 connlib.currentMouseover = this;
             });
-            element.addEventListener("mouseleave", function(){
+            element.addEventListener("mouseleave", function () {
                 this.classList.remove("connlib-cconnector-target");
                 connlib.currentMouseover = null;
             });
@@ -230,10 +230,10 @@ class connlib {
     /**
      * the method sets a marks all breakpoints on the dom
      */
-    static markAllBreakpoints(){
+    static markAllBreakpoints() {
         this.clearAllBreakpoints();
-        for(let i of this.instances){
-            for(let b of i.breakPoints) b.mark();
+        for (let i of this.instances) {
+            for (let b of i.breakPoints) b.mark();
         }
     }
     /**
@@ -411,7 +411,7 @@ class connlibCCreate {
     /**
      * the constructor creates a new connector creation helper
      */
-    constructor(x, y, s){
+    constructor(x, y, s) {
         this.mouseX = x;
         this.mouseY = y;
         this.source = s;
@@ -432,10 +432,10 @@ class connlibCCreate {
     /**
      * the method destroys the current instance
      */
-    destroy(){
+    destroy() {
         this.source.classList.remove("connlib-cconnector-start");
         this.svg.parentNode.removeChild(this.svg);
-        if(this.source && connlib.currentMouseover){
+        if (this.source && connlib.currentMouseover) {
             connlib.instances[0].connect(this.source.id, connlib.currentMouseover.id);
             connlib.instances[0].render();
         }
@@ -443,7 +443,7 @@ class connlibCCreate {
     /**
      * the method updates the target position
      */
-    updateTarget(x, y){
+    updateTarget(x, y) {
         let l = Math.min(this.mouseX, x) - 20;
         let w = Math.max(this.mouseX, x) - l + 20;
         this.svg.style.left = l;
@@ -454,7 +454,7 @@ class connlibCCreate {
         this.svg.style.height = h;
         this.pathH.setAttribute("d", "M" + (this.mouseX - l) + "," + (this.mouseY - t) + " " + (x - l) + "," + (y - t));
         this.path.setAttribute("d", "M" + (this.mouseX - l) + "," + (this.mouseY - t) + " " + (x - l) + "," + (y - t));
-        if(connlib.currentMouseover){
+        if (connlib.currentMouseover) {
             connlib.currentMouseover.classList.add("connlib-cconnector-target");
         }
     }
@@ -657,10 +657,42 @@ class connlibLine extends connlibAbstractRenderable {
     target;
     _rendered = false;
     _initial = 0;
+    intersections = [];
     constructor(connlibInstance) {
         super(connlibInstance);
         connlibExt.overprintGuid(this, "guid");
         connlibInstance.lines.push(this);
+    }
+    /**
+     * the method calculates all intersections
+     */
+    calculateIntersections() {
+        var points = [];
+        switch (this.type) {
+            case connlibLine.lineType.HORIZONTAL:
+                points = this.connlibInstance.lines.filter(
+                    x => x.type == connlibLine.lineType.VERTICAL && connlibExt.doIntersect(this, x)
+                ).map(x => {
+                    return {
+                        "line": x,
+                        "left": x.source.c,
+                        "top": this.source.r
+                    }
+                });
+                break;
+            case connlibLine.lineType.VERTICAL:
+                points = this.connlibInstance.lines.filter(
+                    x => x.type == connlibLine.lineType.VERTICAL && connlibExt.doIntersect(this, x)
+                ).map(x => {
+                    return {
+                        "line": x,
+                        "left": this.source.c,
+                        "top": x.source.r
+                    }
+                });
+                break;
+        }
+        return points;
     }
     /**
      * the method removes the element from the dom
@@ -684,6 +716,7 @@ class connlibLine extends connlibAbstractRenderable {
         output.lsvg = document.createElementNS("http://www.w3.org/2000/svg", "path");
         output.lsvg.style.stroke = "#373737";
         output.lsvg.style.strokeWidth = 1;
+        output.lsvg.style.fill = "transparent";
         output.msvg = document.createElementNS("http://www.w3.org/2000/svg", "path");
         output.msvg.style.stroke = "white";
         output.msvg.style.strokeWidth = 0;
@@ -834,7 +867,20 @@ class connlibLine extends connlibAbstractRenderable {
             }
             if (abort) return;
         }
-        this.lsvg.setAttribute("d", "M" + this.source.c + " " + this.source.r + " L" + this.target.c + " " + this.target.r);
+        var lsvgPath;
+        switch (this.type) {
+            case connlibLine.lineType.HORIZONTAL:
+                lsvgPath = "M" + this.source.c + " " + this.source.r;
+                for(let i of this.intersections) lsvgPath += " L" + (i.left-5) + "," + this.source.r + " C" + (i.left-5) + "," + (this.source.r-7) + " " + (i.left+5) + "," + (this.source.r-7) + " " + (i.left+5) + "," + this.source.r;
+                lsvgPath += " L" + this.target.c + " " + this.target.r;
+                break;
+            case connlibLine.lineType.VERTICAL:
+                lsvgPath = "M" + this.source.c + " " + this.source.r;
+                for(let i of this.intersections) lsvgPath += " L" + this.source.c + "," + (i.top-5) + " C" + (this.source.c-7) + "," + (i.top-5) + " " + (this.source.c-7) + "," + (i.top+5) + " " + this.source.c + "," + (i.top+5);
+                lsvgPath += " L" + this.target.c + " " + this.target.r;
+                break;
+        }
+        this.lsvg.setAttribute("d", lsvgPath);
         this.msvg.setAttribute("d", "M" + this.source.c + " " + this.source.r + " L" + this.target.c + " " + this.target.r);
         this.hsvg.setAttribute("d", "M" + this.source.c + " " + this.source.r + " L" + this.target.c + " " + this.target.r);
     }
@@ -1024,7 +1070,9 @@ class connlibEndpoint extends connlibAbstractRenderable {
                     }
                     break;
                 case connlibEdgeDirection.RIGHT:
-                    this.top = r.top;
+                    this.top = point.r + c.top;
+                    var left = point.c + c.left - connlib._endpointStag;
+                    console.log(this.left, left, this.top, this.source.offsetTop, this.source.offsetTop + this.source.offsetHeight);
                     if (this.top < this.source.offsetTop) {
                         connlib.subscribeAfterMouseMoveObserver((event, self) => {
                             this.direction = connlibEdgeDirection.TOP;
@@ -1042,7 +1090,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
                         });
                         return;
                     }
-                    if (r.left > this._connGridE.c) {
+                    if (this.left < left) {
                         point.unsubscribePositionChange(self);
                         let ref = this.reference();
                         ref.connection = point.connection;
@@ -1084,6 +1132,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 case connlibEdgeDirection.LEFT:
                     this.top = point.r + c.top;
                     var left = point.c + c.left + connlib._endpointStag;
+                    console.log(this.left, left, this.top, this.source.offsetTop, this.source.offsetTop + this.source.offsetHeight);
                     if (this.top < this.source.offsetTop) {
                         connlib.subscribeAfterMouseMoveObserver((event, self) => {
                             this.direction = connlibEdgeDirection.TOP;
@@ -1100,7 +1149,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
                         });
                         return;
                     }
-                    if(this.left > left){
+                    if (this.left > left) {
                         point.unsubscribePositionChange(self);
                         let ref = this.reference();
                         ref.connection = point.connection;
@@ -1131,7 +1180,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
         switch (this.direction) {
             case connlibEdgeDirection.TOP:
                 this.svg.style.left = this.left - (connlib._endpointSizeThk / 2) + this.connlibInstance.container.offsetLeft;
-                this.svg.style.top = this.top - connlib._endpointStag +  this.connlibInstance.container.offsetTop;
+                this.svg.style.top = this.top - connlib._endpointStag + this.connlibInstance.container.offsetTop;
                 this.svg.style.height = connlib._endpointSizeThn + connlib._endpointStag;
                 this.svg.style.width = connlib._endpointSizeThk;
                 this.svg.classList.add("connlib-estag-ver");
@@ -1143,7 +1192,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 break;
             case connlibEdgeDirection.RIGHT:
                 this.svg.style.left = this.left - connlib._endpointSizeThn + this.connlibInstance.container.offsetLeft;
-                this.svg.style.top = this.top - (connlib._endpointSizeThk / 2) +  this.connlibInstance.container.offsetTop;
+                this.svg.style.top = this.top - (connlib._endpointSizeThk / 2) + this.connlibInstance.container.offsetTop;
                 this.svg.style.height = connlib._endpointSizeThk;
                 this.svg.style.width = connlib._endpointSizeThn + connlib._endpointStag;
                 this.svg.classList.add("connlib-estag-hor");
@@ -1154,8 +1203,8 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 pb = { x: (c.x - (connlib._endpointSizeThn / 2)), y: f1.y };
                 break;
             case connlibEdgeDirection.BOTTOM:
-                this.svg.style.left = this.left - (connlib._endpointSizeThk / 2) +  this.connlibInstance.container.offsetLeft;
-                this.svg.style.top = this.top - (connlib._endpointSizeThn) +  this.connlibInstance.container.offsetTop;
+                this.svg.style.left = this.left - (connlib._endpointSizeThk / 2) + this.connlibInstance.container.offsetLeft;
+                this.svg.style.top = this.top - (connlib._endpointSizeThn) + this.connlibInstance.container.offsetTop;
                 this.svg.style.height = connlib._endpointSizeThn + connlib._endpointStag;
                 this.svg.style.width = connlib._endpointSizeThk;
                 this.svg.classList.add("connlib-estag-ver");
@@ -1167,7 +1216,7 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 break;
             case connlibEdgeDirection.LEFT:
                 this.svg.style.left = this.left - connlib._endpointStag + this.connlibInstance.container.offsetLeft;
-                this.svg.style.top = this.top - (connlib._endpointSizeThk / 2) +  this.connlibInstance.container.offsetTop;
+                this.svg.style.top = this.top - (connlib._endpointSizeThk / 2) + this.connlibInstance.container.offsetTop;
                 this.svg.style.height = connlib._endpointSizeThk;
                 this.svg.style.width = connlib._endpointSizeThn + connlib._endpointStag;
                 this.svg.classList.add("connlib-estag-hor");
@@ -1331,12 +1380,12 @@ class connlibBreakPoint extends connlibAbstractRenderable {
     /**
      * the method marks the current endpoint on the connlib instance
      */
-    mark(){
+    mark() {
         let color = "orange";
-        if(this._isEP){
+        if (this._isEP) {
             color = "red";
         }
-        this.connlibInstance.customPoint({left:this.c,top:this.r,color:color,radius:"2",classes:["breakpoint-marker"]});
+        this.connlibInstance.customPoint({ left: this.c, top: this.r, color: color, radius: "2", classes: ["breakpoint-marker"] });
     }
     /**
      * the method removes a breakpoint from the current data model
@@ -1447,12 +1496,12 @@ class connlibExt {
 
         let mEl1 = this.calcMiddle(element1);
         let mEl2 = this.calcMiddle(element2);
-        if(mEl1.left == mEl2.left){
+        if (mEl1.left == mEl2.left) {
             var t1;
             var t2;
             var d1;
             var d2;
-            if(mEl1.top < mEl2.top){
+            if (mEl1.top < mEl2.top) {
                 t1 = element1.offsetTop + element1.offsetHeight;
                 t2 = element2.offsetTop;
                 d1 = connlibEdgeDirection.BOTTOM;
@@ -1729,23 +1778,40 @@ class connlibExt {
         var top = 0, left = 0;
         var last = element;
         do {
-            if(element.tagName == "svg"){
+            if (element.tagName == "svg") {
                 top += parseFloat(element.style.top) || 0;
                 left += parseFloat(element.style.left) || 0;
                 last = element;
                 element = element.parentNode;
             } else {
-                top += element.offsetTop  || 0;
+                top += element.offsetTop || 0;
                 left += element.offsetLeft || 0;
                 last = element;
                 element = element.parentNode;
             }
-        } while(element);
+        } while (element);
         return {
             top: top,
             left: left
         };
     };
+    /**
+     * the method returns whether the two lines have an intersection or not
+     * @param {*} line1 
+     * @param {*} line2 
+     */
+    static doIntersect(line1, line2){
+        if (line1.source.c == line1.target.c) {
+            return !(line2.source.c == line2.target.c && line1.source.c != line2.source.c);
+        } else if (line2.source.c == line2.target.c) {
+            return true;
+        } else {
+            // Both lines are not parallel to the y-axis
+            let m1 = (line1.source.r-line1.target.r)/(line1.source.c-line1.target.c);
+            let m2 = (line2.source.r-line2.target.r)/(line2.source.c-line2.target.c);
+            return m1 != m2;
+        }
+    }
     /**
      * the method calculates the euclydean distance between two points
      * @param {*} p1 
@@ -1866,7 +1932,7 @@ class connlibExt {
         var rawFile = new XMLHttpRequest();
         rawFile.overrideMimeType("application/json");
         rawFile.open("GET", file, true);
-        rawFile.onreadystatechange = function() {
+        rawFile.onreadystatechange = function () {
             if (rawFile.readyState === 4 && rawFile.status == "200") {
                 callback(rawFile.responseText);
             }
