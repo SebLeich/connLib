@@ -323,7 +323,6 @@ class connlib {
         this.clear();
         for (let e of this.endpoints) e.render();
         for (let c of this.connections) {
-            c.calculatePath();
             c.render();
         }
     }
@@ -553,13 +552,6 @@ class connlibConnection extends connlibAbstractRenderable {
                 break;
         }
         this.pathPoints = connlibExt.IDAStar(this.connlibInstance, e1, e2, direction);
-        /*
-        if(e1.connGridE.c == e2.connGridE.c) {
-            this.pathPoints = [e1.connGridE, e2.connGridE];
-        } else {
-            
-        }
-        */
         for (var i = 1; i < this.pathPoints.length; i++) {
             let s = this.pathPoints[i - 1];
             let t = this.pathPoints[i];
@@ -625,6 +617,7 @@ class connlibConnection extends connlibAbstractRenderable {
      */
     render() {
         if (this.isRendered()) this.clear();
+        if(this.pathPoints.length == 0) this.calculatePath();
         for (let l of this.lines) l.render();
         this._rendered = true;
     }
@@ -1072,7 +1065,6 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 case connlibEdgeDirection.RIGHT:
                     this.top = point.r + c.top;
                     var left = point.c + c.left - connlib._endpointStag;
-                    console.log(this.left, left, this.top, this.source.offsetTop, this.source.offsetTop + this.source.offsetHeight);
                     if (this.top < this.source.offsetTop) {
                         connlib.subscribeAfterMouseMoveObserver((event, self) => {
                             this.direction = connlibEdgeDirection.TOP;
@@ -1132,7 +1124,6 @@ class connlibEndpoint extends connlibAbstractRenderable {
                 case connlibEdgeDirection.LEFT:
                     this.top = point.r + c.top;
                     var left = point.c + c.left + connlib._endpointStag;
-                    console.log(this.left, left, this.top, this.source.offsetTop, this.source.offsetTop + this.source.offsetHeight);
                     if (this.top < this.source.offsetTop) {
                         connlib.subscribeAfterMouseMoveObserver((event, self) => {
                             this.direction = connlibEdgeDirection.TOP;
