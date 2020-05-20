@@ -3,3 +3,4 @@ The repository contains a javascript library for connection rendering. The proje
 
 live demo: https://sebleich.github.io/connLib/
 
+![Preview](data/preview.png)
